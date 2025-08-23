@@ -49,6 +49,7 @@
         .user-message {
             background: #e3f2fd;
             text-align: right;
+            position: relative;
         }
         .ai-message {
             background: #f5f5f5;
@@ -56,6 +57,17 @@
         .handoff-message {
             background: #fff3cd;
             border: 1px solid #ffeaa7;
+        }
+        .system-message {
+            background: #e8f5e8;
+            font-style: italic;
+            text-align: center;
+            color: #666;
+        }
+        .message-status {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
         }
     </style>
 </head>
@@ -79,15 +91,24 @@
         let sessionId = null;
         let pollingInterval = null;
         let lastMessageId = 0;
+        let agentJoined = false;
 
         const messagesDiv = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
         const sendBtn = document.getElementById('send-btn');
 
-        function addMessage(content, isUser = false, isHandoff = false) {
+        function addMessage(content, isUser = false, isHandoff = false, isSystem = false, status = null) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isUser ? 'user-message' : (isHandoff ? 'handoff-message' : 'ai-message')}`;
+            messageDiv.className = `message ${isUser ? 'user-message' : (isHandoff ? 'handoff-message' : (isSystem ? 'system-message' : 'ai-message'))}`;
             messageDiv.textContent = content;
+            
+            if (isUser && status) {
+                const statusDiv = document.createElement('div');
+                statusDiv.className = 'message-status';
+                statusDiv.textContent = status;
+                messageDiv.appendChild(statusDiv);
+            }
+            
             messagesDiv.appendChild(messageDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
@@ -96,7 +117,7 @@
             const message = messageInput.value.trim();
             if (!message) return;
 
-            addMessage(message, true);
+            addMessage(message, true, false, false, '✓');
             messageInput.value = '';
 
             try {
@@ -126,8 +147,13 @@
                     // Start polling for agent messages
                     startPolling();
                 } else if (sessionId) {
-                    // Message sent to existing session - don't show response
-                    console.log('Message sent to agent');
+                    // Update last user message with delivered status
+                    const userMessages = document.querySelectorAll('.user-message');
+                    const lastUserMessage = userMessages[userMessages.length - 1];
+                    if (lastUserMessage) {
+                        const statusDiv = lastUserMessage.querySelector('.message-status');
+                        if (statusDiv) statusDiv.textContent = '✓✓';
+                    }
                 } else {
                     addMessage(data.response, false);
                 }
@@ -161,8 +187,21 @@
                         
                         sortedMessages.forEach(msg => {
                             if (msg.id > lastMessageId) {
+                                // Check if agent just joined
+                                if (!agentJoined && msg.author !== 'Anonymous') {
+                                    agentJoined = true;
+                                    addMessage(`${msg.author} joined the chat`, false, false, true);
+                                }
                                 addMessage(`${msg.author}: ${msg.body}`, false);
                                 lastMessageId = msg.id;
+                            }
+                        });
+                        
+                        // Update delivery status for user messages
+                        const userMessages = document.querySelectorAll('.user-message .message-status');
+                        userMessages.forEach(status => {
+                            if (status.textContent === '✓') {
+                                status.textContent = '✓✓';
                             }
                         });
                     }
