@@ -1,10 +1,10 @@
-import openai
+import os
 from typing import Dict, Tuple, Optional
 from .knowledge_base import KnowledgeBase
 
 class AIAgent:
     def __init__(self, api_key: str, confidence_threshold: float = 0.7):
-        openai.api_key = api_key
+        self.api_key = api_key
         self.confidence_threshold = confidence_threshold
         self.kb = KnowledgeBase()
         
@@ -28,7 +28,7 @@ class AIAgent:
             
             try:
                 from openai import OpenAI
-                client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+                client = OpenAI(api_key=self.api_key)
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[
@@ -46,6 +46,11 @@ class AIAgent:
                 
             except Exception as e:
                 print(f"AI processing error: {e}")
+        
+        # Check for explicit human agent requests
+        human_keywords = ['support', 'agent', 'human', 'help', 'talk to someone', 'representative']
+        if any(keyword in message.lower() for keyword in human_keywords):
+            return True, "I'll connect you with a human agent.", 0.0
         
         # No good matches - handoff to human
         return True, "I need to connect you with a human agent for better assistance.", 0.0
