@@ -70,6 +70,11 @@
 
     <script>
         const API_BASE = 'http://149.86.227.49:8000';
+        
+        // Force HTTP for mixed content
+        if (location.protocol === 'https:') {
+            console.warn('Using HTTP API from HTTPS page - this may be blocked by browser');
+        }
         let visitorName = 'Anonymous';
         let sessionId = null;
 
