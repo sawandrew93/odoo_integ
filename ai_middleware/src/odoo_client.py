@@ -47,32 +47,31 @@ class OdooClient:
         channel_id = 2
         
         try:
-            # Create session via web controller with URL parameters
-            params = {
-                'channel_id': channel_id,
-                'anonymous_name': visitor_name,
-                'previous_operator_id': False,
-                'country_id': False
+            # Create session via JSON-RPC
+            rpc_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "channel_id": channel_id,
+                    "anonymous_name": visitor_name,
+                    "previous_operator_id": False,
+                    "country_id": False
+                },
+                "id": 2
             }
             
             response = self.session.post(
                 f"{self.url}/im_livechat/get_session", 
-                params=params
+                json=rpc_data,
+                headers={'Content-Type': 'application/json'}
             )
             
-            print(f"Response status: {response.status_code}")
-            print(f"Response headers: {dict(response.headers)}")
-            print(f"Response text: {response.text[:500]}")
+            result = response.json()
+            print(f"Live chat response: {result}")
             
-            if response.headers.get('content-type', '').startswith('application/json'):
-                result = response.json()
-                print(f"Live chat response: {result}")
-            else:
-                print("Response is not JSON")
-                result = None
-            
-            if result and isinstance(result, dict):
-                session_id = result.get('id')
+            if result.get('result'):
+                session_data = result['result']
+                session_id = session_data.get('id')
                 if session_id:
                     # Send initial message
                     self.send_message_to_session(session_id, message, visitor_name)
