@@ -61,7 +61,8 @@ class OdooClient:
                         "anonymous_name": visitor_name,
                         "previous_operator_id": False,
                         "country_id": False,
-                        "user_id": False
+                        "user_id": False,
+                        "persisted": True
                     },
                     "id": 2
                 }
@@ -78,8 +79,8 @@ class OdooClient:
                             session_id = session_data.get('channel_id')
                             if session_id:
                                 print(f"✅ Live chat session created! ID: {session_id}")
-                                # Send the initial message to notify the agent
-                                self.send_message_to_session(session_id, f"Visitor message: {message}", visitor_name)
+                                # Send the initial message as visitor
+                                self.send_message_to_session(session_id, message, visitor_name)
                                 return session_id
                     except json.JSONDecodeError:
                         print(f"Non-JSON response for channel {channel_id}: {response.text[:200]}")
@@ -95,9 +96,9 @@ class OdooClient:
         return None
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str):
-        """Send message to existing live chat session using discuss channel"""
+        """Send message as visitor to the live chat session"""
         try:
-            # Use the discuss channel message_post method
+            # Send message as visitor (not as authenticated user)
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -107,7 +108,9 @@ class OdooClient:
                     "args": [session_id],
                     "kwargs": {
                         "body": message,
-                        "message_type": "comment"
+                        "message_type": "comment",
+                        "author_id": False,  # No author = visitor message
+                        "email_from": f"{author_name} <visitor@livechat.com>"
                     }
                 },
                 "id": 3
@@ -122,6 +125,8 @@ class OdooClient:
                     
                     if result.get('result'):
                         print(f"✅ Message sent successfully to session {session_id}")
+                        # Trigger notification to agent
+                        self.notify_agent(session_id)
                     else:
                         print(f"❌ Failed to send message: {result}")
                 except json.JSONDecodeError:
@@ -131,3 +136,25 @@ class OdooClient:
             
         except Exception as e:
             print(f"Error sending message: {e}")
+    
+    def notify_agent(self, session_id: int):
+        """Send notification to agent about new message"""
+        try:
+            notify_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "_notify_thread",
+                    "args": [session_id],
+                    "kwargs": {}
+                },
+                "id": 4
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=notify_data)
+            if response.status_code == 200:
+                print(f"✅ Agent notification sent for session {session_id}")
+            
+        except Exception as e:
+            print(f"Error notifying agent: {e}")
