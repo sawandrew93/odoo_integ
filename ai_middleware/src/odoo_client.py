@@ -169,9 +169,8 @@ class OdooClient:
                 "params": {
                     "model": "mail.message",
                     "method": "search_read",
-                    "args": [["res_id", "=", session_id], ["model", "=", "discuss.channel"]],
+                    "args": [[["res_id", "=", session_id], ["model", "=", "discuss.channel"]], ["id", "body", "author_id", "date", "email_from"]],
                     "kwargs": {
-                        "fields": ["id", "body", "author_id", "date", "email_from"],
                         "order": "date desc",
                         "limit": 10
                     }
