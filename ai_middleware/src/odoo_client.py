@@ -9,7 +9,7 @@ class OdooClient:
         self.username = username
         self.password = password
         self.uid = None
-        self.session_id = None
+        self.session = requests.Session()  # Maintain session cookies
         
     def authenticate(self) -> bool:
         """Authenticate with Odoo and get session"""
@@ -25,13 +25,12 @@ class OdooClient:
         }
         
         try:
-            response = requests.post(f"{self.url}/web/session/authenticate", json=auth_data)
+            response = self.session.post(f"{self.url}/web/session/authenticate", json=auth_data)
             result = response.json()
             print(f"Auth response: {result}")
             
             if result.get('result') and result['result'].get('uid'):
                 self.uid = result['result']['uid']
-                self.session_id = response.cookies.get('session_id')
                 return True
         except Exception as e:
             print(f"Auth error: {e}")
@@ -65,7 +64,7 @@ class OdooClient:
                 "id": 2
             }
             
-            response = requests.post(f"{self.url}/web/dataset/call_kw", json=create_data)
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=create_data)
             result = response.json()
             print(f"Live chat response: {result}")
             
@@ -103,4 +102,4 @@ class OdooClient:
             "id": 3
         }
         
-        requests.post(f"{self.url}/jsonrpc", json=message_data)
+        self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
