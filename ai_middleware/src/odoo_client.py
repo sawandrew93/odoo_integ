@@ -79,7 +79,7 @@ class OdooClient:
                             if session_id:
                                 print(f"✅ Live chat session created! ID: {session_id}")
                                 # Send the initial message to notify the agent
-                                self.send_message_to_session(session_id, message, visitor_name)
+                                self.send_message_to_session(session_id, f"Visitor message: {message}", visitor_name)
                                 return session_id
                     except json.JSONDecodeError:
                         print(f"Non-JSON response for channel {channel_id}: {response.text[:200]}")
@@ -95,19 +95,25 @@ class OdooClient:
         return None
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str):
-        """Send message to existing live chat session"""
+        """Send message to existing live chat session using discuss channel"""
         try:
+            # Use the discuss channel message_post method
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "channel_id": session_id,
-                    "message": message
+                    "model": "discuss.channel",
+                    "method": "message_post",
+                    "args": [session_id],
+                    "kwargs": {
+                        "body": message,
+                        "message_type": "comment"
+                    }
                 },
                 "id": 3
             }
             
-            response = self.session.post(f"{self.url}/im_livechat/send_message", json=message_data)
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
             
             if response.status_code == 200:
                 try:
