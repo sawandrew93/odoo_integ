@@ -103,25 +103,18 @@ class OdooClient:
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
-            # Send message as visitor (not as authenticated user)
+            # Send message as visitor using livechat endpoint
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "model": "discuss.channel",
-                    "method": "message_post",
-                    "args": [session_id],
-                    "kwargs": {
-                        "body": message,
-                        "message_type": "comment",
-                        "author_id": False,  # No author = visitor message
-                        "email_from": f"{author_name} <visitor@livechat.com>"
-                    }
+                    "channel_id": session_id,
+                    "message": message
                 },
                 "id": 3
             }
             
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            response = self.session.post(f"{self.url}/im_livechat/send_message", json=message_data)
             
             if response.status_code == 200:
                 try:
@@ -207,12 +200,9 @@ class OdooClient:
                     print(f"Session {session_id} - status: {status}, end_dt: {end_dt}, operator: {operator_id}, members: {len(member_ids)}")
                     
                     # Check multiple conditions for session end
-                    if (status in ['closed', 'ended'] or 
-                        end_dt or 
-                        not operator_id or 
-                        len(member_ids) <= 1):  # Only visitor left
+                    if (status in ['closed', 'ended'] or end_dt):
                         session_ended = True
-                        print(f"Session {session_id} has ended - Reason: status={status}, end_dt={end_dt}, operator={operator_id}, members={len(member_ids)}")
+                        print(f"Session {session_id} has ended - Reason: status={status}, end_dt={end_dt}")
             
             # Get messages
             message_data = {
@@ -262,16 +252,16 @@ class OdooClient:
                             'date': ''
                         })
                     else:
-                        # Double-check with agent status if session appears active
-                        agent_status = self.check_agent_status(session_id)
-                        if not agent_status["active"]:
-                            print(f"Agent disconnected for session {session_id}: {agent_status['reason']}")
+                        # Check if operator was removed (agent left)
+                        if not operator_id:
+                            print(f"Agent left session {session_id} - no operator assigned")
                             messages.append({
                                 'id': 999998,
                                 'body': 'AGENT_DISCONNECTED',
                                 'author': 'System',
                                 'date': ''
                             })
+
                     
                     return messages
             
@@ -330,16 +320,12 @@ class OdooClient:
                     
                     print(f"Session {session_id} active check - status: {status}, end_dt: {end_dt}, operator: {operator_id}, members: {len(member_ids)}")
                     
-                    # Session is inactive if any of these conditions are true:
+                    # Session is inactive if:
                     # 1. Status is closed/ended
-                    # 2. Has end datetime
+                    # 2. Has end datetime  
                     # 3. No operator assigned (agent left)
-                    # 4. Only visitor left in channel (member count <= 1)
-                    if (status in ['closed', 'ended'] or 
-                        end_dt or 
-                        not operator_id or 
-                        len(member_ids) <= 1):
-                        print(f"Session {session_id} is INACTIVE - status={status}, end_dt={end_dt}, operator={operator_id}, members={len(member_ids)}")
+                    if (status in ['closed', 'ended'] or end_dt or not operator_id):
+                        print(f"Session {session_id} is INACTIVE - status={status}, end_dt={end_dt}, operator={operator_id}")
                         return False
                     
                     print(f"Session {session_id} is ACTIVE")
@@ -353,58 +339,42 @@ class OdooClient:
             return False  # Be conservative on error
     
     def check_agent_status(self, session_id: int) -> dict:
-        """Check detailed agent status for the session"""
+        """Check if agent is still in the session"""
         try:
             if not self.uid:
                 if not self.authenticate():
                     return {"active": False, "reason": "auth_failed"}
             
-            # Get channel members with their online status
-            member_data = {
+            # Get session data to check operator
+            session_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "model": "discuss.channel.member",
-                    "method": "search_read",
-                    "args": [[["channel_id", "=", session_id]], [
-                        "partner_id", 
-                        "is_online", 
-                        "last_seen_dt",
-                        "create_date"
-                    ]],
+                    "model": "discuss.channel",
+                    "method": "read",
+                    "args": [[session_id], ["livechat_operator_id", "livechat_status", "livechat_end_dt"]],
                     "kwargs": {}
                 },
                 "id": 9
             }
             
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=member_data)
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=session_data)
             
             if response.status_code == 200:
                 result = response.json()
-                if result.get('result'):
-                    members = result['result']
-                    agent_online = False
-                    visitor_count = 0
+                if result.get('result') and len(result['result']) > 0:
+                    data = result['result'][0]
+                    operator_id = data.get('livechat_operator_id')
+                    status = data.get('livechat_status')
+                    end_dt = data.get('livechat_end_dt')
                     
-                    for member in members:
-                        partner_id = member.get('partner_id')
-                        is_online = member.get('is_online', False)
-                        
-                        if partner_id and isinstance(partner_id, list):
-                            partner_name = partner_id[1]
-                            # Check if this is an agent (not visitor)
-                            if 'visitor' not in partner_name.lower() and 'anonymous' not in partner_name.lower():
-                                if is_online:
-                                    agent_online = True
-                                print(f"Agent {partner_name} online: {is_online}")
-                            else:
-                                visitor_count += 1
+                    # Agent is active if operator assigned and session not ended
+                    agent_active = bool(operator_id) and status not in ['closed', 'ended'] and not end_dt
                     
                     return {
-                        "active": agent_online,
-                        "reason": "agent_offline" if not agent_online else "active",
-                        "member_count": len(members),
-                        "visitor_count": visitor_count
+                        "active": agent_active,
+                        "reason": "active" if agent_active else "agent_left",
+                        "operator_id": operator_id
                     }
             
             return {"active": False, "reason": "no_data"}
