@@ -40,12 +40,14 @@ class AIAgent:
                 )
                 
                 ai_answer = response.choices[0].message.content.strip()
-                confidence = 0.8  # High confidence when we have context
+                confidence = 0.8
                 
                 return False, ai_answer, confidence
                 
             except Exception as e:
                 print(f"AI processing error: {e}")
+                # Fall back to knowledge base answer if OpenAI fails
+                return False, best_match, relevant_docs[0][1]
         
         # Check for explicit human agent requests
         human_keywords = ['support', 'agent', 'human', 'help', 'talk to someone', 'representative']

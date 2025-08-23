@@ -45,92 +45,61 @@ class OdooClient:
                 return None
         
         try:
-            # First get available live chat channels
-            channels_data = {
-                "jsonrpc": "2.0",
-                "method": "call",
+            # Use the web livechat init endpoint
+            init_data = {
                 "params": {
-                    "model": "im_livechat.channel",
-                    "method": "search_read",
-                    "args": [[], ["id", "name"]],
-                    "kwargs": {}
-                },
-                "id": 1
+                    "channel_id": 1,  # Default channel
+                    "anonymous_name": visitor_name
+                }
             }
             
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=channels_data)
-            channels_result = response.json()
+            response = self.session.post(
+                f"{self.url}/im_livechat/init",
+                json=init_data,
+                headers={'Content-Type': 'application/json'}
+            )
             
-            if not channels_result.get('result'):
-                print("No live chat channels found")
-                return None
-                
-            channel_id = channels_result['result'][0]['id']
-            print(f"Using channel ID: {channel_id}")
+            if response.status_code == 200:
+                result = response.json()
+                if result and 'uuid' in result:
+                    session_uuid = result['uuid']
+                    print(f"✅ Live chat session created! UUID: {session_uuid}")
+                    
+                    # Send initial message
+                    self.send_message_to_livechat(session_uuid, message, visitor_name)
+                    return session_uuid
             
-            # Create mail channel for live chat
-            create_data = {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "model": "mail.channel",
-                    "method": "create",
-                    "args": [{
-                        "name": f"Live Chat with {visitor_name}",
-                        "channel_type": "livechat",
-                        "livechat_channel_id": channel_id,
-                        "anonymous_name": visitor_name
-                    }],
-                    "kwargs": {}
-                },
-                "id": 2
-            }
-            
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=create_data)
-            result = response.json()
-            
-            if result.get('result'):
-                session_id = result['result']
-                print(f"✅ Live chat session created! ID: {session_id}")
-                
-                # Send the initial message
-                self.send_message_to_session(session_id, message, visitor_name)
-                return session_id
-            else:
-                print(f"❌ Failed to create session: {result}")
+            print(f"❌ Failed to create session: {response.text}")
                     
         except Exception as e:
             print(f"Odoo session creation error: {e}")
             
         return None
     
-    def send_message_to_session(self, session_id: int, message: str, author_name: str):
-        """Send message to existing live chat session"""
+    def send_message_to_livechat(self, session_uuid: str, message: str, author_name: str):
+        """Send message to livechat session"""
         try:
             message_data = {
-                "jsonrpc": "2.0",
-                "method": "call",
                 "params": {
-                    "model": "mail.channel",
-                    "method": "message_post",
-                    "args": [session_id],
-                    "kwargs": {
-                        "body": message,
-                        "message_type": "comment",
-                        "author_id": False,
-                        "email_from": f"{author_name} <visitor@example.com>"
-                    }
-                },
-                "id": 3
+                    "uuid": session_uuid,
+                    "message_content": message
+                }
             }
             
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
-            result = response.json()
+            response = self.session.post(
+                f"{self.url}/im_livechat/send_message",
+                json=message_data,
+                headers={'Content-Type': 'application/json'}
+            )
             
-            if result.get('result'):
-                print(f"✅ Message sent successfully to session {session_id}")
+            if response.status_code == 200:
+                print(f"✅ Message sent to livechat {session_uuid}")
             else:
-                print(f"❌ Failed to send message: {result}")
+                print(f"❌ Failed to send message: {response.text}")
             
         except Exception as e:
             print(f"Error sending message: {e}")
+    
+    def send_message_to_session(self, session_id, message: str, author_name: str):
+        """Backward compatibility wrapper"""
+        self.send_message_to_livechat(session_id, message, author_name)
