@@ -47,19 +47,17 @@ class OdooClient:
         channel_id = 2
         
         try:
-            # Create session via web controller
-            session_data = {
+            # Create session via web controller with URL parameters
+            params = {
                 'channel_id': channel_id,
                 'anonymous_name': visitor_name,
                 'previous_operator_id': False,
-                'country_id': False,
-                'user_id': False
+                'country_id': False
             }
             
             response = self.session.post(
                 f"{self.url}/im_livechat/get_session", 
-                json=session_data,
-                headers={'Content-Type': 'application/json'}
+                params=params
             )
             
             result = response.json()
@@ -80,16 +78,14 @@ class OdooClient:
     def send_message_to_session(self, session_id: int, message: str, author_name: str):
         """Send message to existing live chat session"""
         try:
-            message_data = {
+            params = {
                 'channel_id': session_id,
-                'message': message,
-                'author_name': author_name
+                'message': message
             }
             
             response = self.session.post(
                 f"{self.url}/im_livechat/send_message",
-                json=message_data,
-                headers={'Content-Type': 'application/json'}
+                params=params
             )
             
             print(f"Message send response: {response.status_code}")
