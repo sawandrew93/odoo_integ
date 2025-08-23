@@ -100,25 +100,34 @@
             messageInput.value = '';
 
             try {
+                const requestBody = {
+                    message: message,
+                    visitor_name: visitorName
+                };
+                
+                // Include session_id if we have one
+                if (sessionId) {
+                    requestBody.session_id = sessionId.toString();
+                }
+
                 const response = await fetch(`${API_BASE}/chat`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        message: message,
-                        visitor_name: visitorName,
-                        session_id: sessionId
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 const data = await response.json();
                 
-                if (data.handoff_needed) {
+                if (data.handoff_needed && data.odoo_session_id) {
                     sessionId = data.odoo_session_id;
                     addMessage(data.response, false, true);
                     // Start polling for agent messages
                     startPolling();
+                } else if (sessionId) {
+                    // Message sent to existing session - don't show response
+                    console.log('Message sent to agent');
                 } else {
                     addMessage(data.response, false);
                 }
@@ -147,7 +156,10 @@
                     const data = await response.json();
                     
                     if (data.messages && data.messages.length > 0) {
-                        data.messages.forEach(msg => {
+                        // Sort messages by ID to ensure proper order
+                        const sortedMessages = data.messages.sort((a, b) => a.id - b.id);
+                        
+                        sortedMessages.forEach(msg => {
                             if (msg.id > lastMessageId) {
                                 addMessage(`${msg.author}: ${msg.body}`, false);
                                 lastMessageId = msg.id;
