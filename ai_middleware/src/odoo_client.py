@@ -45,6 +45,7 @@ class OdooClient:
         
         # Use the live chat web controller (channel ID 2 from your script)
         channel_id = 2
+        print(f"Attempting to create session for channel {channel_id} with visitor {visitor_name}")
         
         try:
             # Create session via JSON-RPC
