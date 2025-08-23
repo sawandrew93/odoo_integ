@@ -1,0 +1,11 @@
+Q: What are your business hours?
+A: We are open Monday to Friday from 9 AM to 6 PM EST.
+
+Q: How can I track my order?
+A: You can track your order by logging into your account and visiting the Orders section.
+
+Q: What is your return policy?
+A: We accept returns within 30 days of purchase. Items must be in original condition.
+
+Q: How do I reset my password?
+A: Click on "Forgot Password" on the login page and follow the instructions sent to your email.
