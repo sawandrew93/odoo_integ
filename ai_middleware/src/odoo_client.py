@@ -44,7 +44,7 @@ class OdooClient:
             if not self.authenticate():
                 return None
         
-        # Get live chat channel (assuming channel ID 2 from your script)
+        # Get live chat channel (ID 2 from your script)
         channel_id = 2
         
         try:
@@ -67,6 +67,7 @@ class OdooClient:
             
             response = requests.post(f"{self.url}/web/dataset/call_kw", json=create_data)
             result = response.json()
+            print(f"Live chat response: {result}")
             
             if result.get('result'):
                 session_data = result['result']
