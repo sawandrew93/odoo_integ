@@ -118,15 +118,7 @@ async def get_messages(session_id: int):
         print(f"Error getting messages: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting messages: {str(e)}")
 
-@app.get("/session/{session_id}/status")
-async def get_session_status(session_id: int):
-    """Check if session is still active"""
-    try:
-        is_active = odoo_client.is_session_active(session_id)
-        return {"active": is_active}
-    except Exception as e:
-        print(f"Error checking session status: {e}")
-        return {"active": False}
+
 
 @app.get("/health")
 async def health_check():
