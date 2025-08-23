@@ -55,6 +55,28 @@ class ChatResponse(BaseModel):
 async def handle_chat(chat_message: ChatMessage):
     """Main endpoint for handling chat messages"""
     try:
+        # If session_id exists, send message directly to Odoo
+        if chat_message.session_id:
+            success = odoo_client.send_message_to_session(
+                int(chat_message.session_id), 
+                chat_message.message, 
+                chat_message.visitor_name
+            )
+            
+            if success:
+                return ChatResponse(
+                    response="Message sent to agent",
+                    handoff_needed=True,
+                    confidence=1.0,
+                    odoo_session_id=int(chat_message.session_id)
+                )
+            else:
+                return ChatResponse(
+                    response="Failed to send message to agent",
+                    handoff_needed=False,
+                    confidence=0.0
+                )
+        
         # Process message with AI agent
         handoff_needed, ai_response, confidence = ai_agent.should_handoff(
             chat_message.message, 

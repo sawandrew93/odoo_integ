@@ -95,7 +95,7 @@ class OdooClient:
         print("❌ All channels failed")
         return None
     
-    def send_message_to_session(self, session_id: int, message: str, author_name: str):
+    def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
         """Send message as visitor to the live chat session"""
         try:
             # Send message as visitor (not as authenticated user)
@@ -127,15 +127,20 @@ class OdooClient:
                         print(f"✅ Message sent successfully to session {session_id}")
                         # Trigger notification to agent
                         self.notify_agent(session_id)
+                        return True
                     else:
                         print(f"❌ Failed to send message: {result}")
+                        return False
                 except json.JSONDecodeError:
                     print(f"Non-JSON response when sending message: {response.text[:200]}")
+                    return False
             else:
                 print(f"HTTP {response.status_code} when sending message")
+                return False
             
         except Exception as e:
             print(f"Error sending message: {e}")
+            return False
     
     def notify_agent(self, session_id: int):
         """Send notification to agent about new message"""
