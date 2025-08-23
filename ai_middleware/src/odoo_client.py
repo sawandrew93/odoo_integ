@@ -158,3 +158,43 @@ class OdooClient:
             
         except Exception as e:
             print(f"Error notifying agent: {e}")
+    
+    def get_session_messages(self, session_id: int):
+        """Get messages from live chat session"""
+        try:
+            message_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "message_fetch",
+                    "args": [session_id],
+                    "kwargs": {
+                        "limit": 10
+                    }
+                },
+                "id": 5
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    messages = []
+                    for msg in result['result']:
+                        # Only return agent messages (not visitor messages)
+                        if msg.get('author_id') and msg['author_id'][0] != False:
+                            messages.append({
+                                'id': msg['id'],
+                                'body': msg['body'],
+                                'author': msg['author_id'][1],
+                                'date': msg['date']
+                            })
+                    return messages
+            
+            return []
+            
+        except Exception as e:
+            print(f"Error getting messages: {e}")
+            return []

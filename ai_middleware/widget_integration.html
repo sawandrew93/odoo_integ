@@ -77,6 +77,8 @@
         }
         let visitorName = 'Anonymous';
         let sessionId = null;
+        let pollingInterval = null;
+        let lastMessageId = 0;
 
         const messagesDiv = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
@@ -115,6 +117,8 @@
                 if (data.handoff_needed) {
                     sessionId = data.odoo_session_id;
                     addMessage(data.response, false, true);
+                    // Start polling for agent messages
+                    startPolling();
                 } else {
                     addMessage(data.response, false);
                 }
@@ -132,6 +136,30 @@
             }
         });
 
+        function startPolling() {
+            if (pollingInterval) return; // Already polling
+            
+            pollingInterval = setInterval(async () => {
+                if (!sessionId) return;
+                
+                try {
+                    const response = await fetch(`${API_BASE}/messages/${sessionId}`);
+                    const data = await response.json();
+                    
+                    if (data.messages && data.messages.length > 0) {
+                        data.messages.forEach(msg => {
+                            if (msg.id > lastMessageId) {
+                                addMessage(`${msg.author}: ${msg.body}`, false);
+                                lastMessageId = msg.id;
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 2000); // Poll every 2 seconds
+        }
+        
         // Initialize
         addMessage('Hello! How can I help you today?', false);
     </script>
