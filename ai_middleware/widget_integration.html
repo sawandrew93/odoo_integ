@@ -175,9 +175,24 @@
             if (pollingInterval) return; // Already polling
             
             pollingInterval = setInterval(async () => {
-                if (!sessionId) return;
+                if (!sessionId || sessionEnded) return;
                 
                 try {
+                    // Check session status first
+                    const statusResponse = await fetch(`${API_BASE}/session/${sessionId}/status`);
+                    const statusData = await statusResponse.json();
+                    
+                    if (!statusData.active) {
+                        addMessage('Agent has left the chat', false, false, true);
+                        sessionEnded = true;
+                        messageInput.disabled = true;
+                        sendBtn.disabled = true;
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        return;
+                    }
+                    
+                    // Get messages
                     const response = await fetch(`${API_BASE}/messages/${sessionId}`);
                     const data = await response.json();
                     
@@ -187,18 +202,6 @@
                         
                         sortedMessages.forEach(msg => {
                             if (msg.id > lastMessageId) {
-                                // Check for session ended
-                                if (msg.body === 'SESSION_ENDED') {
-                                    addMessage('Agent has left the chat', false, false, true);
-                                    agentJoined = false;
-                                    sessionEnded = true;
-                                    clearInterval(pollingInterval);
-                                    pollingInterval = null;
-                                    messageInput.disabled = true;
-                                    sendBtn.disabled = true;
-                                    return;
-                                }
-                                
                                 // Check if agent just joined
                                 if (!agentJoined && msg.author !== 'Anonymous') {
                                     agentJoined = true;
@@ -208,8 +211,6 @@
                                 lastMessageId = msg.id;
                             }
                         });
-                        
-
                     }
                 } catch (error) {
                     console.error('Polling error:', error);

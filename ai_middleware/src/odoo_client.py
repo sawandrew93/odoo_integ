@@ -273,3 +273,37 @@ class OdooClient:
         except Exception as e:
             print(f"Error getting messages: {e}")
             return []
+    
+    def is_session_active(self, session_id: int) -> bool:
+        """Check if session is still active"""
+        try:
+            session_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "read",
+                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]]
+                },
+                "id": 8
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=session_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result') and len(result['result']) > 0:
+                    status = result['result'][0].get('livechat_status')
+                    end_dt = result['result'][0].get('livechat_end_dt')
+                    print(f"Session {session_id} check - status: {status}, end_dt: {end_dt}")
+                    
+                    # Session is inactive if closed/ended or has end datetime
+                    if status in ['closed', 'ended'] or end_dt:
+                        return False
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"Error checking session status: {e}")
+            return False
