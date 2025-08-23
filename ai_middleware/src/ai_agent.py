@@ -18,12 +18,12 @@ class AIAgent:
         relevant_docs = self.kb.search(message, top_k=3)
         
         # If we have good knowledge base matches, extract relevant answer
-        if relevant_docs and relevant_docs[0][1] > 0.5:
+        if relevant_docs and relevant_docs[0][1] >= 0.8:  # Higher threshold for direct answers
             best_match = relevant_docs[0][0]
             # Extract specific Q&A from the document
             lines = best_match.split('\n')
             for i, line in enumerate(lines):
-                if message.lower() in line.lower() or any(word in line.lower() for word in message.lower().split()):
+                if message.lower() in line.lower():
                     # Return this Q&A pair
                     if i + 1 < len(lines):
                         return False, f"{line}\n{lines[i+1]}", relevant_docs[0][1]

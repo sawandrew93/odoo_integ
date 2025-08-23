@@ -16,20 +16,21 @@ class OdooClient:
         auth_data = {
             "jsonrpc": "2.0",
             "method": "call",
-            "params": {
-                "service": "common",
-                "method": "authenticate",
-                "args": [self.db, self.username, self.password, {}]
-            },
+            "params": [self.db, self.username, self.password, {}],
             "id": 1
         }
         
-        response = requests.post(f"{self.url}/jsonrpc", json=auth_data)
-        result = response.json()
-        
-        if result.get('result'):
-            self.uid = result['result']
-            return True
+        try:
+            response = requests.post(f"{self.url}/web/session/authenticate", json=auth_data)
+            result = response.json()
+            
+            if result.get('result') and result['result'].get('uid'):
+                self.uid = result['result']['uid']
+                self.session_id = result['result'].get('session_id')
+                return True
+        except Exception as e:
+            print(f"Auth error: {e}")
+            
         return False
     
     def create_live_chat_session(self, visitor_name: str, message: str) -> Optional[int]:
@@ -47,22 +48,19 @@ class OdooClient:
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "service": "object",
-                    "method": "execute_kw",
-                    "args": [
-                        self.db, self.uid, self.password,
-                        'im_livechat.channel', 'get_mail_channel',
-                        [channel_id], {
-                            'anonymous_name': visitor_name,
-                            'previous_operator_id': False,
-                            'country_id': False
-                        }
-                    ]
+                    "model": "im_livechat.channel",
+                    "method": "get_mail_channel",
+                    "args": [channel_id],
+                    "kwargs": {
+                        'anonymous_name': visitor_name,
+                        'previous_operator_id': False,
+                        'country_id': False
+                    }
                 },
                 "id": 2
             }
             
-            response = requests.post(f"{self.url}/jsonrpc", json=create_data)
+            response = requests.post(f"{self.url}/web/dataset/call_kw", json=create_data)
             result = response.json()
             
             if result.get('result'):
