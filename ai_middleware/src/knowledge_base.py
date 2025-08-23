@@ -17,19 +17,24 @@ class KnowledgeBase:
         query_lower = query.lower()
         results = []
         
+        # Split documents into individual Q&A pairs
+        qa_pairs = []
         for doc in self.documents:
-            doc_lower = doc.lower()
-            # Look for exact phrase matches first
-            if query_lower in doc_lower:
-                results.append((doc, 1.0))
-            else:
-                # Then keyword matches
-                query_words = query_lower.split()
-                important_words = [w for w in query_words if len(w) > 3]  # Skip short words
-                if important_words:
-                    score = sum(1 for word in important_words if word in doc_lower)
-                    if score > 0:
-                        results.append((doc, score / len(important_words)))
+            lines = doc.strip().split('\n')
+            for i in range(0, len(lines)-1, 2):
+                if i+1 < len(lines) and lines[i].startswith('Q:'):
+                    qa_pair = f"{lines[i]}\n{lines[i+1]}"
+                    qa_pairs.append(qa_pair)
+        
+        # Search in Q&A pairs
+        for qa in qa_pairs:
+            qa_lower = qa.lower()
+            # Look for keyword matches in questions
+            query_words = [w for w in query_lower.split() if len(w) > 2]
+            if query_words:
+                score = sum(1 for word in query_words if word in qa_lower)
+                if score > 0:
+                    results.append((qa, score / len(query_words)))
         
         # Sort by score and return top_k
         results.sort(key=lambda x: x[1], reverse=True)
