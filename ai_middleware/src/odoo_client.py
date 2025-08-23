@@ -167,7 +167,29 @@ class OdooClient:
     def get_session_messages(self, session_id: int):
         """Get messages from live chat session"""
         try:
-            # Use mail.message search to get channel messages
+            # Check session status first
+            session_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "read",
+                    "args": [[session_id], ["livechat_status"]]
+                },
+                "id": 6
+            }
+            
+            session_response = self.session.post(f"{self.url}/web/dataset/call_kw", json=session_data)
+            session_ended = False
+            
+            if session_response.status_code == 200:
+                session_result = session_response.json()
+                if session_result.get('result') and len(session_result['result']) > 0:
+                    status = session_result['result'][0].get('livechat_status')
+                    if status in ['closed', 'ended']:
+                        session_ended = True
+            
+            # Get messages
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -184,11 +206,9 @@ class OdooClient:
             }
             
             response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
-            print(f"Messages response: {response.status_code}")
             
             if response.status_code == 200:
                 result = response.json()
-                print(f"Messages result: {result}")
                 
                 if result.get('result'):
                     messages = []
@@ -206,6 +226,16 @@ class OdooClient:
                                     'author': msg['author_id'][1] if isinstance(msg['author_id'], list) else 'Agent',
                                     'date': msg['date']
                                 })
+                    
+                    # Add session ended indicator if needed
+                    if session_ended:
+                        messages.append({
+                            'id': 999999,
+                            'body': 'SESSION_ENDED',
+                            'author': 'System',
+                            'date': ''
+                        })
+                    
                     return messages
             
             return []

@@ -93,6 +93,7 @@
         let lastMessageId = 0;
         let agentJoined = false;
 
+
         const messagesDiv = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
         const sendBtn = document.getElementById('send-btn');
@@ -187,6 +188,15 @@
                         
                         sortedMessages.forEach(msg => {
                             if (msg.id > lastMessageId) {
+                                // Check for session ended
+                                if (msg.body === 'SESSION_ENDED') {
+                                    addMessage('Agent has left the chat', false, false, true);
+                                    agentJoined = false;
+                                    clearInterval(pollingInterval);
+                                    pollingInterval = null;
+                                    return;
+                                }
+                                
                                 // Check if agent just joined
                                 if (!agentJoined && msg.author !== 'Anonymous') {
                                     agentJoined = true;
