@@ -153,6 +153,10 @@
                         sessionEnded = true;
                         messageInput.disabled = true;
                         sendBtn.disabled = true;
+                        if (pollingInterval) {
+                            clearInterval(pollingInterval);
+                            pollingInterval = null;
+                        }
                     }
                 } else {
                     if (data.response) addMessage(data.response, false);
@@ -183,7 +187,13 @@
                     const statusData = await statusResponse.json();
                     
                     if (!statusData.active) {
-                        addMessage('Agent has left the chat', false, false, true);
+                        let message = 'Agent has left the chat';
+                        if (statusData.reason === 'agent_offline') {
+                            message = 'Agent went offline and left the chat';
+                        } else if (statusData.reason === 'session_closed') {
+                            message = 'Chat session was closed by the agent';
+                        }
+                        addMessage(message, false, false, true);
                         sessionEnded = true;
                         messageInput.disabled = true;
                         sendBtn.disabled = true;
@@ -202,12 +212,22 @@
                         
                         sortedMessages.forEach(msg => {
                             if (msg.id > lastMessageId) {
-                                // Check if agent just joined
-                                if (!agentJoined && msg.author !== 'Anonymous') {
-                                    agentJoined = true;
-                                    addMessage(`${msg.author} joined the chat`, false, false, true);
+                                // Handle system messages
+                                if (msg.body === 'SESSION_ENDED' || msg.body === 'AGENT_DISCONNECTED') {
+                                    addMessage('Agent has left the chat', false, false, true);
+                                    sessionEnded = true;
+                                    messageInput.disabled = true;
+                                    sendBtn.disabled = true;
+                                    clearInterval(pollingInterval);
+                                    pollingInterval = null;
+                                } else {
+                                    // Check if agent just joined
+                                    if (!agentJoined && msg.author !== 'Anonymous' && msg.author !== 'System') {
+                                        agentJoined = true;
+                                        addMessage(`${msg.author} joined the chat`, false, false, true);
+                                    }
+                                    addMessage(`${msg.author}: ${msg.body}`, false);
                                 }
-                                addMessage(`${msg.author}: ${msg.body}`, false);
                                 lastMessageId = msg.id;
                             }
                         });
@@ -215,7 +235,7 @@
                 } catch (error) {
                     console.error('Polling error:', error);
                 }
-            }, 2000); // Poll every 2 seconds
+            }, 1500); // Poll every 1.5 seconds for faster detection
         }
         
         // Initialize

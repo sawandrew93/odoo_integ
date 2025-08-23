@@ -98,31 +98,10 @@ class OdooClient:
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
         """Send message as visitor to the live chat session"""
         try:
-            # First check if session is still active
-            check_data = {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "model": "discuss.channel",
-                    "method": "read",
-                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]],
-                    "kwargs": {}
-                },
-                "id": 7
-            }
-            
-            check_response = self.session.post(f"{self.url}/web/dataset/call_kw", json=check_data)
-            if check_response.status_code == 200:
-                check_result = check_response.json()
-                if check_result.get('result') and len(check_result['result']) > 0:
-                    status = check_result['result'][0].get('livechat_status')
-                    end_dt = check_result['result'][0].get('livechat_end_dt')
-                    print(f"Before sending - Session {session_id} status: {status}, end_dt: {end_dt}")
-                    
-                    # If session is closed or ended, don't send message
-                    if status in ['closed', 'ended'] or end_dt:
-                        print(f"Session {session_id} is closed, cannot send message")
-                        return False
+            # First check if session is still active with comprehensive check
+            if not self.is_session_active(session_id):
+                print(f"Session {session_id} is not active, cannot send message")
+                return False
             
             # Send message as visitor (not as authenticated user)
             message_data = {
@@ -193,14 +172,20 @@ class OdooClient:
     def get_session_messages(self, session_id: int):
         """Get messages from live chat session"""
         try:
-            # Check session status first
+            # Check comprehensive session status
             session_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
                     "model": "discuss.channel",
                     "method": "read",
-                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]],
+                    "args": [[session_id], [
+                        "livechat_status", 
+                        "livechat_end_dt", 
+                        "livechat_operator_id",
+                        "channel_member_ids",
+                        "is_member"
+                    ]],
                     "kwargs": {}
                 },
                 "id": 6
@@ -213,12 +198,21 @@ class OdooClient:
                 session_result = session_response.json()
                 print(f"Session status check: {session_result}")
                 if session_result.get('result') and len(session_result['result']) > 0:
-                    status = session_result['result'][0].get('livechat_status')
-                    end_dt = session_result['result'][0].get('livechat_end_dt')
-                    print(f"Session {session_id} status: {status}, end_dt: {end_dt}")
-                    if status in ['closed', 'ended'] or end_dt:
+                    channel_data = session_result['result'][0]
+                    status = channel_data.get('livechat_status')
+                    end_dt = channel_data.get('livechat_end_dt')
+                    operator_id = channel_data.get('livechat_operator_id')
+                    member_ids = channel_data.get('channel_member_ids', [])
+                    
+                    print(f"Session {session_id} - status: {status}, end_dt: {end_dt}, operator: {operator_id}, members: {len(member_ids)}")
+                    
+                    # Check multiple conditions for session end
+                    if (status in ['closed', 'ended'] or 
+                        end_dt or 
+                        not operator_id or 
+                        len(member_ids) <= 1):  # Only visitor left
                         session_ended = True
-                        print(f"Session {session_id} has ended")
+                        print(f"Session {session_id} has ended - Reason: status={status}, end_dt={end_dt}, operator={operator_id}, members={len(member_ids)}")
             
             # Get messages
             message_data = {
@@ -267,6 +261,17 @@ class OdooClient:
                             'author': 'System',
                             'date': ''
                         })
+                    else:
+                        # Double-check with agent status if session appears active
+                        agent_status = self.check_agent_status(session_id)
+                        if not agent_status["active"]:
+                            print(f"Agent disconnected for session {session_id}: {agent_status['reason']}")
+                            messages.append({
+                                'id': 999998,
+                                'body': 'AGENT_DISCONNECTED',
+                                'author': 'System',
+                                'date': ''
+                            })
                     
                     return messages
             
@@ -277,20 +282,27 @@ class OdooClient:
             return []
     
     def is_session_active(self, session_id: int) -> bool:
-        """Check if session is still active"""
+        """Check if session is still active with comprehensive checks"""
         try:
             # Re-authenticate if needed
             if not self.uid:
                 if not self.authenticate():
                     return False
             
+            # Get comprehensive session data
             session_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
                     "model": "discuss.channel",
                     "method": "read",
-                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]],
+                    "args": [[session_id], [
+                        "livechat_status", 
+                        "livechat_end_dt", 
+                        "livechat_operator_id",
+                        "channel_member_ids",
+                        "is_member"
+                    ]],
                     "kwargs": {}
                 },
                 "id": 8
@@ -310,17 +322,93 @@ class OdooClient:
                             result = response.json()
                 
                 if result.get('result') and len(result['result']) > 0:
-                    status = result['result'][0].get('livechat_status')
-                    end_dt = result['result'][0].get('livechat_end_dt')
-                    print(f"Session {session_id} check - status: {status}, end_dt: {end_dt}")
+                    channel_data = result['result'][0]
+                    status = channel_data.get('livechat_status')
+                    end_dt = channel_data.get('livechat_end_dt')
+                    operator_id = channel_data.get('livechat_operator_id')
+                    member_ids = channel_data.get('channel_member_ids', [])
                     
-                    # Session is inactive if closed/ended or has end datetime
-                    if status in ['closed', 'ended'] or end_dt:
+                    print(f"Session {session_id} active check - status: {status}, end_dt: {end_dt}, operator: {operator_id}, members: {len(member_ids)}")
+                    
+                    # Session is inactive if any of these conditions are true:
+                    # 1. Status is closed/ended
+                    # 2. Has end datetime
+                    # 3. No operator assigned (agent left)
+                    # 4. Only visitor left in channel (member count <= 1)
+                    if (status in ['closed', 'ended'] or 
+                        end_dt or 
+                        not operator_id or 
+                        len(member_ids) <= 1):
+                        print(f"Session {session_id} is INACTIVE - status={status}, end_dt={end_dt}, operator={operator_id}, members={len(member_ids)}")
                         return False
+                    
+                    print(f"Session {session_id} is ACTIVE")
                     return True
             
-            return True  # Assume active if we can't check
+            print(f"Session {session_id} - Cannot determine status, assuming inactive")
+            return False  # Be conservative - assume inactive if we can't check
             
         except Exception as e:
             print(f"Error checking session status: {e}")
-            return True  # Assume active on error
+            return False  # Be conservative on error
+    
+    def check_agent_status(self, session_id: int) -> dict:
+        """Check detailed agent status for the session"""
+        try:
+            if not self.uid:
+                if not self.authenticate():
+                    return {"active": False, "reason": "auth_failed"}
+            
+            # Get channel members with their online status
+            member_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel.member",
+                    "method": "search_read",
+                    "args": [[["channel_id", "=", session_id]], [
+                        "partner_id", 
+                        "is_online", 
+                        "last_seen_dt",
+                        "create_date"
+                    ]],
+                    "kwargs": {}
+                },
+                "id": 9
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=member_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    members = result['result']
+                    agent_online = False
+                    visitor_count = 0
+                    
+                    for member in members:
+                        partner_id = member.get('partner_id')
+                        is_online = member.get('is_online', False)
+                        
+                        if partner_id and isinstance(partner_id, list):
+                            partner_name = partner_id[1]
+                            # Check if this is an agent (not visitor)
+                            if 'visitor' not in partner_name.lower() and 'anonymous' not in partner_name.lower():
+                                if is_online:
+                                    agent_online = True
+                                print(f"Agent {partner_name} online: {is_online}")
+                            else:
+                                visitor_count += 1
+                    
+                    return {
+                        "active": agent_online,
+                        "reason": "agent_offline" if not agent_online else "active",
+                        "member_count": len(members),
+                        "visitor_count": visitor_count
+                    }
+            
+            return {"active": False, "reason": "no_data"}
+            
+        except Exception as e:
+            print(f"Error checking agent status: {e}")
+            return {"active": False, "reason": "error"}
