@@ -14,13 +14,17 @@ class AIAgent:
     
     def should_handoff(self, message: str, context: str = "") -> Tuple[bool, str, float]:
         """Determine if message should be handed off to human agent"""
+        # Check for explicit human agent requests first
+        human_keywords = ['support', 'agent', 'human', 'help', 'talk to someone', 'representative']
+        if any(keyword in message.lower() for keyword in human_keywords):
+            return True, "I'll connect you with a human agent.", 0.0
+        
         # Get relevant context from knowledge base
         relevant_docs = self.kb.search(message, top_k=3)
         
         # If we have good knowledge base matches, return the answer
         if relevant_docs and relevant_docs[0][1] >= 0.5:
-            best_match = relevant_docs[0][0]
-            return False, best_match, relevant_docs[0][1]
+            return False, relevant_docs[0][0], relevant_docs[0][1]
         
         # If we have some context, use AI to process it
         if relevant_docs:
@@ -40,19 +44,12 @@ class AIAgent:
                 )
                 
                 ai_answer = response.choices[0].message.content.strip()
-                confidence = 0.8
-                
-                return False, ai_answer, confidence
+                return False, ai_answer, 0.8
                 
             except Exception as e:
                 print(f"AI processing error: {e}")
-                # Fall back to knowledge base answer if OpenAI fails
-                return False, best_match, relevant_docs[0][1]
-        
-        # Check for explicit human agent requests
-        human_keywords = ['support', 'agent', 'human', 'help', 'talk to someone', 'representative']
-        if any(keyword in message.lower() for keyword in human_keywords):
-            return True, "I'll connect you with a human agent.", 0.0
+                # Fall back to knowledge base answer
+                return False, relevant_docs[0][0], relevant_docs[0][1]
         
         # No good matches - handoff to human
         return True, "I need to connect you with a human agent for better assistance.", 0.0
