@@ -78,6 +78,8 @@ class OdooClient:
                             session_id = session_data.get('channel_id')
                             if session_id:
                                 print(f"✅ Live chat session created! ID: {session_id}")
+                                # Send the initial message to notify the agent
+                                self.send_message_to_session(session_id, message, visitor_name)
                                 return session_id
                     except json.JSONDecodeError:
                         print(f"Non-JSON response for channel {channel_id}: {response.text[:200]}")
