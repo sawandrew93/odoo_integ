@@ -37,35 +37,44 @@ class OdooClient:
         if not self.uid:
             if not self.authenticate():
                 return None
-                
-        create_data = {
-            "jsonrpc": "2.0",
-            "method": "call",
-            "params": {
-                "service": "object",
-                "method": "execute_kw",
-                "args": [
-                    self.db, self.uid, self.password,
-                    'im_livechat.channel', 'create_session',
-                    [], {
-                        'anonymous_name': visitor_name,
-                        'previous_operator_id': False,
-                        'user_id': False,
-                        'country_id': False
-                    }
-                ]
-            },
-            "id": 2
-        }
         
-        response = requests.post(f"{self.url}/jsonrpc", json=create_data)
-        result = response.json()
+        # Get live chat channel (assuming channel ID 2 from your script)
+        channel_id = 2
         
-        if result.get('result'):
-            session_id = result['result'].get('id')
-            if session_id:
-                self.send_message_to_session(session_id, message, visitor_name)
-            return session_id
+        try:
+            # Create session via im_livechat.channel
+            create_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "service": "object",
+                    "method": "execute_kw",
+                    "args": [
+                        self.db, self.uid, self.password,
+                        'im_livechat.channel', 'get_mail_channel',
+                        [channel_id], {
+                            'anonymous_name': visitor_name,
+                            'previous_operator_id': False,
+                            'country_id': False
+                        }
+                    ]
+                },
+                "id": 2
+            }
+            
+            response = requests.post(f"{self.url}/jsonrpc", json=create_data)
+            result = response.json()
+            
+            if result.get('result'):
+                session_data = result['result']
+                session_id = session_data.get('id')
+                if session_id:
+                    self.send_message_to_session(session_id, message, visitor_name)
+                    return session_id
+                    
+        except Exception as e:
+            print(f"Odoo session creation error: {e}")
+            
         return None
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str):
