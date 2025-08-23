@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import os
@@ -10,6 +11,15 @@ from .ai_agent import AIAgent
 load_dotenv()
 
 app = FastAPI(title="AI Middleware for Odoo Live Chat")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize components
 odoo_client = OdooClient(
@@ -73,6 +83,7 @@ async def handle_chat(chat_message: ChatMessage):
         )
         
     except Exception as e:
+        print(f"Chat error: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 
 @app.get("/health")
