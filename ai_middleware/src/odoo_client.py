@@ -103,18 +103,25 @@ class OdooClient:
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
-            # Send message as visitor using livechat endpoint
+            # Send message as visitor (not as authenticated user)
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "channel_id": session_id,
-                    "message": message
+                    "model": "discuss.channel",
+                    "method": "message_post",
+                    "args": [session_id],
+                    "kwargs": {
+                        "body": message,
+                        "message_type": "comment",
+                        "author_id": False,  # No author = visitor message
+                        "email_from": f"{author_name} <visitor@livechat.com>"
+                    }
                 },
                 "id": 3
             }
             
-            response = self.session.post(f"{self.url}/im_livechat/send_message", json=message_data)
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
             
             if response.status_code == 200:
                 try:
@@ -251,16 +258,6 @@ class OdooClient:
                             'author': 'System',
                             'date': ''
                         })
-                    else:
-                        # Check if operator was removed (agent left)
-                        if not operator_id:
-                            print(f"Agent left session {session_id} - no operator assigned")
-                            messages.append({
-                                'id': 999998,
-                                'body': 'AGENT_DISCONNECTED',
-                                'author': 'System',
-                                'date': ''
-                            })
 
                     
                     return messages
