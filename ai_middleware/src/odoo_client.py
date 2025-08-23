@@ -277,6 +277,11 @@ class OdooClient:
     def is_session_active(self, session_id: int) -> bool:
         """Check if session is still active"""
         try:
+            # Re-authenticate if needed
+            if not self.uid:
+                if not self.authenticate():
+                    return False
+            
             session_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -292,6 +297,15 @@ class OdooClient:
             
             if response.status_code == 200:
                 result = response.json()
+                
+                # Check for session expired error
+                if result.get('error') and 'Session Expired' in str(result['error']):
+                    # Re-authenticate and try again
+                    if self.authenticate():
+                        response = self.session.post(f"{self.url}/web/dataset/call_kw", json=session_data)
+                        if response.status_code == 200:
+                            result = response.json()
+                
                 if result.get('result') and len(result['result']) > 0:
                     status = result['result'][0].get('livechat_status')
                     end_dt = result['result'][0].get('livechat_end_dt')
@@ -302,8 +316,8 @@ class OdooClient:
                         return False
                     return True
             
-            return False
+            return True  # Assume active if we can't check
             
         except Exception as e:
             print(f"Error checking session status: {e}")
-            return False
+            return True  # Assume active on error
