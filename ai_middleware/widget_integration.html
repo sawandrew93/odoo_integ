@@ -178,6 +178,21 @@
                 if (!sessionId || sessionEnded) return;
                 
                 try {
+                    // Check session status first
+                    const statusResponse = await fetch(`${API_BASE}/session/${sessionId}/status`);
+                    const statusData = await statusResponse.json();
+                    
+                    if (!statusData.active) {
+                        addMessage('Agent has left the chat', false, false, true);
+                        sessionEnded = true;
+                        messageInput.disabled = true;
+                        sendBtn.disabled = true;
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        return;
+                    }
+                    
+                    // Get messages
                     const response = await fetch(`${API_BASE}/messages/${sessionId}`);
                     const data = await response.json();
                     
