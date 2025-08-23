@@ -192,9 +192,12 @@ class OdooClient:
                         if msg.get('author_id') and msg['author_id'] != False:
                             # Skip visitor messages (check if it's not from visitor email)
                             if not (msg.get('email_from') and 'visitor@livechat.com' in msg['email_from']):
+                                # Strip HTML tags from body
+                                import re
+                                clean_body = re.sub(r'<[^>]+>', '', msg['body'])
                                 messages.append({
                                     'id': msg['id'],
-                                    'body': msg['body'],
+                                    'body': clean_body,
                                     'author': msg['author_id'][1] if isinstance(msg['author_id'], list) else 'Agent',
                                     'date': msg['date']
                                 })
