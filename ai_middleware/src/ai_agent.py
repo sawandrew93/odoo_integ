@@ -16,7 +16,7 @@ class AIAgent:
         """Determine if message should be handed off to human agent"""
         # Get relevant context from knowledge base
         relevant_docs = self.kb.search(message, top_k=3)
-        kb_context = "\n".join([doc for doc, score in relevant_docs if score > 0.5])
+        kb_context = "\n".join([doc for doc, score in relevant_docs if score > 0.3])
         
         # Create prompt for AI decision
         system_prompt = f"""You are an AI assistant for customer support. Based on the knowledge base context below, determine if you can confidently answer the customer's question.
