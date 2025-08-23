@@ -16,17 +16,22 @@ class OdooClient:
         auth_data = {
             "jsonrpc": "2.0",
             "method": "call",
-            "params": [self.db, self.username, self.password, {}],
+            "params": {
+                "db": self.db,
+                "login": self.username,
+                "password": self.password
+            },
             "id": 1
         }
         
         try:
             response = requests.post(f"{self.url}/web/session/authenticate", json=auth_data)
             result = response.json()
+            print(f"Auth response: {result}")
             
             if result.get('result') and result['result'].get('uid'):
                 self.uid = result['result']['uid']
-                self.session_id = result['result'].get('session_id')
+                self.session_id = response.cookies.get('session_id')
                 return True
         except Exception as e:
             print(f"Auth error: {e}")
