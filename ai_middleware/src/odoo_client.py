@@ -55,7 +55,8 @@ class OdooClient:
                     "channel_id": channel_id,
                     "anonymous_name": visitor_name,
                     "previous_operator_id": False,
-                    "country_id": False
+                    "country_id": False,
+                    "user_id": False
                 },
                 "id": 2
             }
