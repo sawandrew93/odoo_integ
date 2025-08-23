@@ -65,7 +65,7 @@ async def handle_chat(chat_message: ChatMessage):
             
             if success:
                 return ChatResponse(
-                    response="Message sent to agent",
+                    response="",
                     handoff_needed=True,
                     confidence=1.0,
                     odoo_session_id=int(chat_message.session_id)

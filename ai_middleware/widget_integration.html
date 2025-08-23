@@ -155,8 +155,9 @@
                         const statusDiv = lastUserMessage.querySelector('.message-status');
                         if (statusDiv) statusDiv.textContent = '✓✓';
                     }
+                    // Don't show empty response
                 } else {
-                    addMessage(data.response, false);
+                    if (data.response) addMessage(data.response, false);
                 }
 
             } catch (error) {
