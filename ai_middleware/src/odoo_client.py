@@ -1,6 +1,5 @@
 import requests
 import json
-import os
 from typing import Dict, Any, Optional
 
 class OdooClient:
@@ -10,7 +9,12 @@ class OdooClient:
         self.username = username
         self.password = password
         self.uid = None
-        self.session = requests.Session()  # Maintain session cookies
+        self.session = requests.Session()
+        # Set proper headers for Odoo Online
+        self.session.headers.update({
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (compatible; AI-Middleware/1.0)'
+        })
         
     def authenticate(self) -> bool:
         """Authenticate with Odoo and get session"""
@@ -44,62 +48,78 @@ class OdooClient:
             if not self.authenticate():
                 return None
         
-        try:
-            # Use the web livechat init endpoint
-            init_data = {
-                "params": {
-                    "channel_id": 1,  # Default channel
-                    "anonymous_name": visitor_name
+        # Try channel ID 1 first, then 2
+        for channel_id in [1, 2]:
+            print(f"Attempting to create session for channel {channel_id} with visitor {visitor_name}")
+            
+            try:
+                rpc_data = {
+                    "jsonrpc": "2.0",
+                    "method": "call",
+                    "params": {
+                        "channel_id": channel_id,
+                        "anonymous_name": visitor_name,
+                        "previous_operator_id": False,
+                        "country_id": False,
+                        "user_id": False
+                    },
+                    "id": 2
                 }
-            }
-            
-            response = self.session.post(
-                f"{self.url}/im_livechat/init",
-                json=init_data,
-                headers={'Content-Type': 'application/json'}
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result and 'uuid' in result:
-                    session_uuid = result['uuid']
-                    print(f"✅ Live chat session created! UUID: {session_uuid}")
+                
+                response = self.session.post(f"{self.url}/im_livechat/get_session", json=rpc_data)
+                
+                if response.status_code == 200:
+                    try:
+                        result = response.json()
+                        print(f"Live chat response: {result}")
+                        
+                        if result.get('result') and result['result'] != False:
+                            session_data = result['result']
+                            session_id = session_data.get('channel_id')
+                            if session_id:
+                                print(f"✅ Live chat session created! ID: {session_id}")
+                                return session_id
+                    except json.JSONDecodeError:
+                        print(f"Non-JSON response for channel {channel_id}: {response.text[:200]}")
+                        continue
+                else:
+                    print(f"HTTP {response.status_code} for channel {channel_id}")
                     
-                    # Send initial message
-                    self.send_message_to_livechat(session_uuid, message, visitor_name)
-                    return session_uuid
-            
-            print(f"❌ Failed to create session: {response.text}")
-                    
-        except Exception as e:
-            print(f"Odoo session creation error: {e}")
-            
+            except Exception as e:
+                print(f"Error with channel {channel_id}: {e}")
+                continue
+        
+        print("❌ All channels failed")
         return None
     
-    def send_message_to_livechat(self, session_uuid: str, message: str, author_name: str):
-        """Send message to livechat session"""
+    def send_message_to_session(self, session_id: int, message: str, author_name: str):
+        """Send message to existing live chat session"""
         try:
             message_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
                 "params": {
-                    "uuid": session_uuid,
-                    "message_content": message
-                }
+                    "channel_id": session_id,
+                    "message": message
+                },
+                "id": 3
             }
             
-            response = self.session.post(
-                f"{self.url}/im_livechat/send_message",
-                json=message_data,
-                headers={'Content-Type': 'application/json'}
-            )
+            response = self.session.post(f"{self.url}/im_livechat/send_message", json=message_data)
             
             if response.status_code == 200:
-                print(f"✅ Message sent to livechat {session_uuid}")
+                try:
+                    result = response.json()
+                    print(f"Message send result: {result}")
+                    
+                    if result.get('result'):
+                        print(f"✅ Message sent successfully to session {session_id}")
+                    else:
+                        print(f"❌ Failed to send message: {result}")
+                except json.JSONDecodeError:
+                    print(f"Non-JSON response when sending message: {response.text[:200]}")
             else:
-                print(f"❌ Failed to send message: {response.text}")
+                print(f"HTTP {response.status_code} when sending message")
             
         except Exception as e:
             print(f"Error sending message: {e}")
-    
-    def send_message_to_session(self, session_id, message: str, author_name: str):
-        """Backward compatibility wrapper"""
-        self.send_message_to_livechat(session_id, message, author_name)
