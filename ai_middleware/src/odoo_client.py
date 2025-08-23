@@ -174,7 +174,7 @@ class OdooClient:
                 "params": {
                     "model": "discuss.channel",
                     "method": "read",
-                    "args": [[session_id], ["livechat_status"]]
+                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]]
                 },
                 "id": 6
             }
@@ -187,8 +187,9 @@ class OdooClient:
                 print(f"Session status check: {session_result}")
                 if session_result.get('result') and len(session_result['result']) > 0:
                     status = session_result['result'][0].get('livechat_status')
-                    print(f"Session {session_id} status: {status}")
-                    if status in ['closed', 'ended']:
+                    end_dt = session_result['result'][0].get('livechat_end_dt')
+                    print(f"Session {session_id} status: {status}, end_dt: {end_dt}")
+                    if status in ['closed', 'ended'] or end_dt:
                         session_ended = True
                         print(f"Session {session_id} has ended")
             

@@ -149,7 +149,7 @@
 
                 const data = await response.json();
                 
-                if (data.handoff_needed && data.odoo_session_id) {
+                if (data.handoff_needed && data.odoo_session_id && !sessionId) {
                     sessionId = data.odoo_session_id;
                     addMessage(data.response, false, true);
                     // Start polling for agent messages
