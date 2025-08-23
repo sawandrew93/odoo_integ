@@ -17,9 +17,16 @@ class AIAgent:
         # Get relevant context from knowledge base
         relevant_docs = self.kb.search(message, top_k=3)
         
-        # If we have good knowledge base matches, try to answer directly
+        # If we have good knowledge base matches, extract relevant answer
         if relevant_docs and relevant_docs[0][1] > 0.5:
             best_match = relevant_docs[0][0]
+            # Extract specific Q&A from the document
+            lines = best_match.split('\n')
+            for i, line in enumerate(lines):
+                if message.lower() in line.lower() or any(word in line.lower() for word in message.lower().split()):
+                    # Return this Q&A pair
+                    if i + 1 < len(lines):
+                        return False, f"{line}\n{lines[i+1]}", relevant_docs[0][1]
             return False, best_match, relevant_docs[0][1]
         
         # If we have some context, use AI to process it
