@@ -60,8 +60,16 @@ class OdooClient:
                 params=params
             )
             
-            result = response.json()
-            print(f"Live chat response: {result}")
+            print(f"Response status: {response.status_code}")
+            print(f"Response headers: {dict(response.headers)}")
+            print(f"Response text: {response.text[:500]}")
+            
+            if response.headers.get('content-type', '').startswith('application/json'):
+                result = response.json()
+                print(f"Live chat response: {result}")
+            else:
+                print("Response is not JSON")
+                result = None
             
             if result and isinstance(result, dict):
                 session_id = result.get('id')
