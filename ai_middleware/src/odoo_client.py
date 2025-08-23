@@ -264,14 +264,16 @@ class OdooClient:
                         previous_operator = self.operator_states.get(session_id)
                         current_operator = operator_id
                         
-                        if previous_operator and not current_operator:
-                            print(f"Agent left session {session_id} - operator removed")
-                            messages.append({
-                                'id': 999998,
-                                'body': 'AGENT_DISCONNECTED',
-                                'author': 'System',
-                                'date': ''
-                            })
+                        # Only check for disconnect if we have a previous state
+                        if previous_operator is not None:
+                            if previous_operator and not current_operator:
+                                print(f"Agent left session {session_id} - operator removed")
+                                messages.append({
+                                    'id': 999998,
+                                    'body': 'AGENT_DISCONNECTED',
+                                    'author': 'System',
+                                    'date': ''
+                                })
                         
                         # Update operator state
                         self.operator_states[session_id] = current_operator
