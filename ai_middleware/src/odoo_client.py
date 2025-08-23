@@ -75,7 +75,9 @@ class OdooClient:
                 session_id = session_data.get('channel_id')
                 if session_id:
                     print(f"✅ Live chat session created! ID: {session_id}")
-                    # Send initial message
+                    # Send initial message with delay to ensure session is ready
+                    import time
+                    time.sleep(2)
                     self.send_message_to_session(session_id, message, visitor_name)
                     return session_id
             else:
