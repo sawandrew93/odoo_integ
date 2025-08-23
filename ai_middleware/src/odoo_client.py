@@ -92,28 +92,29 @@ class OdooClient:
     def send_message_to_session(self, session_id: int, message: str, author_name: str):
         """Send message to existing live chat session"""
         try:
-            # Use JSON-RPC for message posting
-            rpc_data = {
+            # Send message via live chat endpoint
+            message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "model": "discuss.channel",
-                    "method": "message_post",
-                    "args": [session_id],
-                    "kwargs": {
-                        "body": message,
-                        "message_type": "comment"
-                    }
+                    "channel_id": session_id,
+                    "message": message
                 },
                 "id": 3
             }
             
             response = self.session.post(
-                f"{self.url}/web/dataset/call_kw",
-                json=rpc_data
+                f"{self.url}/im_livechat/send_message",
+                json=message_data
             )
             
-            print(f"Message send response: {response.status_code}")
+            result = response.json()
+            print(f"Message send result: {result}")
+            
+            if result.get('result'):
+                print(f"✅ Message sent successfully to session {session_id}")
+            else:
+                print(f"❌ Failed to send message: {result}")
             
         except Exception as e:
             print(f"Error sending message: {e}")
