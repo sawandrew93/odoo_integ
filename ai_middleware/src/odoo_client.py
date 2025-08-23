@@ -162,14 +162,17 @@ class OdooClient:
     def get_session_messages(self, session_id: int):
         """Get messages from live chat session"""
         try:
+            # Use mail.message search to get channel messages
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "model": "discuss.channel",
-                    "method": "message_fetch",
-                    "args": [session_id],
+                    "model": "mail.message",
+                    "method": "search_read",
+                    "args": [["res_id", "=", session_id], ["model", "=", "discuss.channel"]],
                     "kwargs": {
+                        "fields": ["id", "body", "author_id", "date", "email_from"],
+                        "order": "date desc",
                         "limit": 10
                     }
                 },
@@ -177,20 +180,25 @@ class OdooClient:
             }
             
             response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            print(f"Messages response: {response.status_code}")
             
             if response.status_code == 200:
                 result = response.json()
+                print(f"Messages result: {result}")
+                
                 if result.get('result'):
                     messages = []
                     for msg in result['result']:
-                        # Only return agent messages (not visitor messages)
-                        if msg.get('author_id') and msg['author_id'][0] != False:
-                            messages.append({
-                                'id': msg['id'],
-                                'body': msg['body'],
-                                'author': msg['author_id'][1],
-                                'date': msg['date']
-                            })
+                        # Only return agent messages (messages with author_id)
+                        if msg.get('author_id') and msg['author_id'] != False:
+                            # Skip visitor messages (check if it's not from visitor email)
+                            if not (msg.get('email_from') and 'visitor@livechat.com' in msg['email_from']):
+                                messages.append({
+                                    'id': msg['id'],
+                                    'body': msg['body'],
+                                    'author': msg['author_id'][1] if isinstance(msg['author_id'], list) else 'Agent',
+                                    'date': msg['date']
+                                })
                     return messages
             
             return []
