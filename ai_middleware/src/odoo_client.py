@@ -105,7 +105,8 @@ class OdooClient:
                 "params": {
                     "model": "discuss.channel",
                     "method": "read",
-                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]]
+                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]],
+                    "kwargs": {}
                 },
                 "id": 7
             }
@@ -199,7 +200,8 @@ class OdooClient:
                 "params": {
                     "model": "discuss.channel",
                     "method": "read",
-                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]]
+                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]],
+                    "kwargs": {}
                 },
                 "id": 6
             }
@@ -288,7 +290,8 @@ class OdooClient:
                 "params": {
                     "model": "discuss.channel",
                     "method": "read",
-                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]]
+                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]],
+                    "kwargs": {}
                 },
                 "id": 8
             }
