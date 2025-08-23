@@ -43,35 +43,32 @@ class OdooClient:
             if not self.authenticate():
                 return None
         
-        # Get live chat channel (ID 2 from your script)
+        # Use the live chat web controller (channel ID 2 from your script)
         channel_id = 2
         
         try:
-            # Create session via im_livechat.channel
-            create_data = {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "model": "im_livechat.channel",
-                    "method": "get_mail_channel",
-                    "args": [channel_id],
-                    "kwargs": {
-                        'anonymous_name': visitor_name,
-                        'previous_operator_id': False,
-                        'country_id': False
-                    }
-                },
-                "id": 2
+            # Create session via web controller
+            session_data = {
+                'channel_id': channel_id,
+                'anonymous_name': visitor_name,
+                'previous_operator_id': False,
+                'country_id': False,
+                'user_id': False
             }
             
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=create_data)
+            response = self.session.post(
+                f"{self.url}/im_livechat/get_session", 
+                json=session_data,
+                headers={'Content-Type': 'application/json'}
+            )
+            
             result = response.json()
             print(f"Live chat response: {result}")
             
-            if result.get('result'):
-                session_data = result['result']
-                session_id = session_data.get('id')
+            if result and isinstance(result, dict):
+                session_id = result.get('id')
                 if session_id:
+                    # Send initial message
                     self.send_message_to_session(session_id, message, visitor_name)
                     return session_id
                     
@@ -82,24 +79,20 @@ class OdooClient:
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str):
         """Send message to existing live chat session"""
-        message_data = {
-            "jsonrpc": "2.0",
-            "method": "call",
-            "params": {
-                "service": "object",
-                "method": "execute_kw",
-                "args": [
-                    self.db, self.uid, self.password,
-                    'mail.channel', 'message_post',
-                    [session_id], {
-                        'body': message,
-                        'message_type': 'comment',
-                        'author_id': False,
-                        'email_from': f"{author_name} <visitor@example.com>"
-                    }
-                ]
-            },
-            "id": 3
-        }
-        
-        self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+        try:
+            message_data = {
+                'channel_id': session_id,
+                'message': message,
+                'author_name': author_name
+            }
+            
+            response = self.session.post(
+                f"{self.url}/im_livechat/send_message",
+                json=message_data,
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            print(f"Message send response: {response.status_code}")
+            
+        except Exception as e:
+            print(f"Error sending message: {e}")
