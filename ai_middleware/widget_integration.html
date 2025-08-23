@@ -99,18 +99,10 @@
         const messageInput = document.getElementById('message-input');
         const sendBtn = document.getElementById('send-btn');
 
-        function addMessage(content, isUser = false, isHandoff = false, isSystem = false, status = null) {
+        function addMessage(content, isUser = false, isHandoff = false, isSystem = false) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user-message' : (isHandoff ? 'handoff-message' : (isSystem ? 'system-message' : 'ai-message'))}`;
             messageDiv.textContent = content;
-            
-            if (isUser && status) {
-                const statusDiv = document.createElement('div');
-                statusDiv.className = 'message-status';
-                statusDiv.textContent = status;
-                messageDiv.appendChild(statusDiv);
-            }
-            
             messagesDiv.appendChild(messageDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
@@ -125,7 +117,7 @@
                 return;
             }
 
-            addMessage(message, true, false, false, '✓');
+            addMessage(message, true);
             messageInput.value = '';
 
             try {
@@ -155,12 +147,12 @@
                     // Start polling for agent messages
                     startPolling();
                 } else if (sessionId) {
-                    // Update last user message with delivered status
-                    const userMessages = document.querySelectorAll('.user-message');
-                    const lastUserMessage = userMessages[userMessages.length - 1];
-                    if (lastUserMessage) {
-                        const statusDiv = lastUserMessage.querySelector('.message-status');
-                        if (statusDiv) statusDiv.textContent = '✓✓';
+                    // Check if session ended
+                    if (data.response === 'SESSION_ENDED') {
+                        addMessage('Agent has left the chat', false, false, true);
+                        sessionEnded = true;
+                        messageInput.disabled = true;
+                        sendBtn.disabled = true;
                     }
                 } else {
                     if (data.response) addMessage(data.response, false);
@@ -217,13 +209,7 @@
                             }
                         });
                         
-                        // Update delivery status for user messages
-                        const userMessages = document.querySelectorAll('.user-message .message-status');
-                        userMessages.forEach(status => {
-                            if (status.textContent === '✓') {
-                                status.textContent = '✓✓';
-                            }
-                        });
+
                     }
                 } catch (error) {
                     console.error('Polling error:', error);

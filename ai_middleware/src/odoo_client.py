@@ -98,6 +98,31 @@ class OdooClient:
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
         """Send message as visitor to the live chat session"""
         try:
+            # First check if session is still active
+            check_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "read",
+                    "args": [[session_id], ["livechat_status", "livechat_end_dt"]]
+                },
+                "id": 7
+            }
+            
+            check_response = self.session.post(f"{self.url}/web/dataset/call_kw", json=check_data)
+            if check_response.status_code == 200:
+                check_result = check_response.json()
+                if check_result.get('result') and len(check_result['result']) > 0:
+                    status = check_result['result'][0].get('livechat_status')
+                    end_dt = check_result['result'][0].get('livechat_end_dt')
+                    print(f"Before sending - Session {session_id} status: {status}, end_dt: {end_dt}")
+                    
+                    # If session is closed or ended, don't send message
+                    if status in ['closed', 'ended'] or end_dt:
+                        print(f"Session {session_id} is closed, cannot send message")
+                        return False
+            
             # Send message as visitor (not as authenticated user)
             message_data = {
                 "jsonrpc": "2.0",

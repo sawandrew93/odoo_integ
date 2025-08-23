@@ -72,7 +72,7 @@ async def handle_chat(chat_message: ChatMessage):
                 )
             else:
                 return ChatResponse(
-                    response="Failed to send message to agent",
+                    response="SESSION_ENDED",
                     handoff_needed=False,
                     confidence=0.0
                 )
