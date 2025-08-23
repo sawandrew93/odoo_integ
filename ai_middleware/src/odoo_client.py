@@ -10,6 +10,7 @@ class OdooClient:
         self.password = password
         self.uid = None
         self.session = requests.Session()
+        self.operator_states = {}  # Track operator changes
         # Set proper headers for Odoo Online
         self.session.headers.update({
             'Content-Type': 'application/json',
@@ -258,7 +259,22 @@ class OdooClient:
                             'author': 'System',
                             'date': ''
                         })
-
+                    else:
+                        # Check if operator was removed (agent left)
+                        previous_operator = self.operator_states.get(session_id)
+                        current_operator = operator_id
+                        
+                        if previous_operator and not current_operator:
+                            print(f"Agent left session {session_id} - operator removed")
+                            messages.append({
+                                'id': 999998,
+                                'body': 'AGENT_DISCONNECTED',
+                                'author': 'System',
+                                'date': ''
+                            })
+                        
+                        # Update operator state
+                        self.operator_states[session_id] = current_operator
                     
                     return messages
             
