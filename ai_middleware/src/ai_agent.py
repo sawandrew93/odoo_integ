@@ -27,7 +27,9 @@ class AIAgent:
             kb_context = "\n".join([doc for doc, score in relevant_docs if score > 0.2])
             
             try:
-                response = openai.ChatCompletion.create(
+                from openai import OpenAI
+                client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+                response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[
                         {"role": "system", "content": f"Answer the customer question using this context: {kb_context}"},
