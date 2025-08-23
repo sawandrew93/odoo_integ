@@ -69,7 +69,7 @@ class OdooClient:
             result = response.json()
             print(f"Live chat response: {result}")
             
-            if result.get('result'):
+            if result.get('result') and result['result'] != False:
                 session_data = result['result']
                 session_id = session_data.get('channel_id')
                 if session_id:
@@ -77,6 +77,9 @@ class OdooClient:
                     # Send initial message
                     self.send_message_to_session(session_id, message, visitor_name)
                     return session_id
+            else:
+                print(f"❌ Live chat creation failed: {result.get('result')}")
+                print("This might mean no agents are available or channel is not properly configured")
                     
         except Exception as e:
             print(f"Odoo session creation error: {e}")
