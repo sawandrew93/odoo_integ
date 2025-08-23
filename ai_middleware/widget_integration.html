@@ -92,6 +92,7 @@
         let pollingInterval = null;
         let lastMessageId = 0;
         let agentJoined = false;
+        let sessionEnded = false;
 
 
         const messagesDiv = document.getElementById('chat-messages');
@@ -117,6 +118,12 @@
         async function sendMessage() {
             const message = messageInput.value.trim();
             if (!message) return;
+            
+            // Don't send if session ended
+            if (sessionEnded) {
+                addMessage('Chat session has ended. Please refresh to start a new chat.', false, false, true);
+                return;
+            }
 
             addMessage(message, true, false, false, '✓');
             messageInput.value = '';
@@ -155,7 +162,6 @@
                         const statusDiv = lastUserMessage.querySelector('.message-status');
                         if (statusDiv) statusDiv.textContent = '✓✓';
                     }
-                    // Don't show empty response
                 } else {
                     if (data.response) addMessage(data.response, false);
                 }
@@ -193,8 +199,11 @@
                                 if (msg.body === 'SESSION_ENDED') {
                                     addMessage('Agent has left the chat', false, false, true);
                                     agentJoined = false;
+                                    sessionEnded = true;
                                     clearInterval(pollingInterval);
                                     pollingInterval = null;
+                                    messageInput.disabled = true;
+                                    sendBtn.disabled = true;
                                     return;
                                 }
                                 

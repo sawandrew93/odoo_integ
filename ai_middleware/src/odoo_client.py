@@ -184,10 +184,13 @@ class OdooClient:
             
             if session_response.status_code == 200:
                 session_result = session_response.json()
+                print(f"Session status check: {session_result}")
                 if session_result.get('result') and len(session_result['result']) > 0:
                     status = session_result['result'][0].get('livechat_status')
+                    print(f"Session {session_id} status: {status}")
                     if status in ['closed', 'ended']:
                         session_ended = True
+                        print(f"Session {session_id} has ended")
             
             # Get messages
             message_data = {
@@ -229,6 +232,7 @@ class OdooClient:
                     
                     # Add session ended indicator if needed
                     if session_ended:
+                        print(f"Adding SESSION_ENDED message for session {session_id}")
                         messages.append({
                             'id': 999999,
                             'body': 'SESSION_ENDED',
