@@ -50,10 +50,34 @@ class WebSocketManager:
         """Monitor session using Odoo's longpolling for real-time notifications"""
         print(f"⚡ Starting longpolling monitoring for session {session_id}")
         
+        agent_joined = False
+        session_ended = False
+        
         async def message_callback(data):
             """Callback for new messages from Odoo"""
+            nonlocal agent_joined, session_ended
+            
             if session_id in self.connections:
-                await self.send_message(session_id, data)
+                if data.get('type') == 'message':
+                    # Check if agent just joined
+                    if not agent_joined:
+                        agent_joined = True
+                        await self.send_message(session_id, {
+                            "type": "agent_joined",
+                            "message": f"{data['data']['author']} joined the chat"
+                        })
+                    
+                    await self.send_message(session_id, data)
+                    
+                elif data.get('type') == 'session_ended':
+                    session_ended = True
+                    await self.send_message(session_id, data)
+                    # Show feedback after session ends
+                    await asyncio.sleep(2)
+                    await self.send_message(session_id, {
+                        "type": "show_feedback",
+                        "message": "Please rate this conversation"
+                    })
         
         # Start longpolling listener
         longpoll_task = asyncio.create_task(
@@ -62,12 +86,12 @@ class WebSocketManager:
         
         # Monitor session status separately
         try:
-            while session_id in self.connections:
+            while session_id in self.connections and not session_ended:
                 # Check session status every 30 seconds
                 await asyncio.sleep(30)
                 
                 if not self.odoo_client.is_session_active(session_id):
-                    await self.send_message(session_id, {
+                    await message_callback({
                         "type": "session_ended",
                         "message": "Agent has left the chat"
                     })

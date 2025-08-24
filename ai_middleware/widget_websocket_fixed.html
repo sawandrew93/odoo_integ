@@ -142,13 +142,16 @@
                     if (data.type === 'message') {
                         const msg = data.data;
                         addMessage(`${msg.author}: ${msg.body}`, false);
+                    } else if (data.type === 'agent_joined') {
+                        addMessage(data.message, false, false, true);
                     } else if (data.type === 'session_ended') {
                         addMessage(data.message, false, false, true);
                         sessionEnded = true;
                         messageInput.disabled = true;
                         sendBtn.disabled = true;
                         websocket.close();
-                        setTimeout(showFeedbackSurvey, 2000);
+                    } else if (data.type === 'show_feedback') {
+                        showFeedbackSurvey();
                     }
                 };
                 

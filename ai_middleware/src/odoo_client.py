@@ -447,16 +447,24 @@ class OdooClient:
                             if not (msg.get('email_from') and 'visitor@livechat.com' in msg['email_from']):
                                 import re
                                 clean_body = re.sub(r'<[^>]+>', '', msg['body'])
+                                author_name = msg['author_id'][1] if isinstance(msg['author_id'], list) else 'Agent'
                                 
-                                await callback({
-                                    'type': 'message',
-                                    'data': {
-                                        'id': msg['id'],
-                                        'body': clean_body,
-                                        'author': msg['author_id'][1] if isinstance(msg['author_id'], list) else 'Agent',
-                                        'date': msg['date']
-                                    }
-                                })
+                                # Check if agent left
+                                if 'left the channel' in clean_body or 'left the conversation' in clean_body:
+                                    await callback({
+                                        'type': 'session_ended',
+                                        'message': f'{author_name} ended the session'
+                                    })
+                                else:
+                                    await callback({
+                                        'type': 'message',
+                                        'data': {
+                                            'id': msg['id'],
+                                            'body': clean_body,
+                                            'author': author_name,
+                                            'date': msg['date']
+                                        }
+                                    })
                                 
                                 last_message_id = max(last_message_id, msg['id'])
                 
