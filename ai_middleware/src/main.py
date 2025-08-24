@@ -128,6 +128,31 @@ async def get_session_status(session_id: int):
         print(f"Error checking session status: {e}")
         return {"active": False}
 
+class FeedbackRequest(BaseModel):
+    session_id: int
+    rating: str
+    comment: Optional[str] = ""
+
+@app.post("/feedback")
+async def submit_feedback(feedback: FeedbackRequest):
+    """Submit feedback for a chat session"""
+    try:
+        # Store feedback in Odoo
+        success = odoo_client.store_feedback(
+            feedback.session_id,
+            feedback.rating,
+            feedback.comment
+        )
+        
+        if success:
+            return {"status": "success", "message": "Feedback submitted"}
+        else:
+            return {"status": "error", "message": "Failed to submit feedback"}
+            
+    except Exception as e:
+        print(f"Feedback error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error submitting feedback: {str(e)}")
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""

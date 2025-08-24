@@ -397,3 +397,37 @@ class OdooClient:
         except Exception as e:
             print(f"Error checking agent status: {e}")
             return {"active": False, "reason": "error"}
+    
+    def store_feedback(self, session_id: int, rating: str, comment: str = "") -> bool:
+        """Store feedback for a chat session in Odoo"""
+        try:
+            # Add note to the channel with feedback
+            feedback_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "message_post",
+                    "args": [session_id],
+                    "kwargs": {
+                        "body": f"<p><strong>Customer Feedback:</strong> {rating.upper()}</p><p>{comment}</p>",
+                        "message_type": "comment",
+                        "subtype_xmlid": "mail.mt_note"
+                    }
+                },
+                "id": 9
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=feedback_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    print(f"✅ Feedback stored for session {session_id}: {rating}")
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"Error storing feedback: {e}")
+            return False
