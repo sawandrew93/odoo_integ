@@ -47,61 +47,34 @@ class WebSocketManager:
         return False
     
     async def _monitor_session(self, session_id: int):
-        """Monitor session using Odoo's native WebSocket bus"""
-        print(f"⚡ Starting WebSocket monitoring for session {session_id}")
+        """Monitor session using Odoo's longpolling for real-time notifications"""
+        print(f"⚡ Starting longpolling monitoring for session {session_id}")
         
-        # Subscribe to Odoo's WebSocket bus for this channel
-        odoo_ws = await self.odoo_client.connect_to_odoo_websocket(session_id)
+        async def message_callback(data):
+            """Callback for new messages from Odoo"""
+            if session_id in self.connections:
+                await self.send_message(session_id, data)
         
-        if not odoo_ws:
-            print(f"❌ Failed to connect to Odoo WebSocket for session {session_id}")
-            self.disconnect(session_id)
-            return
+        # Start longpolling listener
+        longpoll_task = asyncio.create_task(
+            self.odoo_client.start_longpolling_listener(session_id, message_callback)
+        )
         
+        # Monitor session status separately
         try:
             while session_id in self.connections:
-                try:
-                    # Listen for real-time messages from Odoo WebSocket
-                    message = await odoo_ws.recv()
-                    data = json.loads(message)
-                    
-                    if data.get('type') == 'mail.message':
-                        # New message from agent
-                        msg_data = data.get('payload', {})
-                        if msg_data.get('author_id') and 'visitor@livechat.com' not in str(msg_data.get('email_from', '')):
-                            await self.send_message(session_id, {
-                                "type": "message",
-                                "data": {
-                                    'id': msg_data.get('id'),
-                                    'body': msg_data.get('body', '').replace('<p>', '').replace('</p>', ''),
-                                    'author': msg_data.get('author_id', [None, 'Agent'])[1] if isinstance(msg_data.get('author_id'), list) else 'Agent',
-                                    'date': msg_data.get('date')
-                                }
-                            })
-                    
-                    elif data.get('type') == 'channel.ended':
-                        await self.send_message(session_id, {
-                            "type": "session_ended",
-                            "message": "Agent has left the chat"
-                        })
-                        break
-                        
-                except asyncio.TimeoutError:
-                    # Check if session is still active periodically
-                    if not self.odoo_client.is_session_active(session_id):
-                        await self.send_message(session_id, {
-                            "type": "session_ended",
-                            "message": "Agent has left the chat"
-                        })
-                        break
-                        
-                except Exception as e:
-                    print(f"❌ WebSocket message error for session {session_id}: {e}")
-                    await asyncio.sleep(1)
+                # Check session status every 30 seconds
+                await asyncio.sleep(30)
+                
+                if not self.odoo_client.is_session_active(session_id):
+                    await self.send_message(session_id, {
+                        "type": "session_ended",
+                        "message": "Agent has left the chat"
+                    })
+                    break
                     
         except Exception as e:
-            print(f"❌ WebSocket monitoring error for session {session_id}: {e}")
+            print(f"❌ Session monitoring error for {session_id}: {e}")
         finally:
-            if odoo_ws:
-                await odoo_ws.close()
+            longpoll_task.cancel()
             self.disconnect(session_id)

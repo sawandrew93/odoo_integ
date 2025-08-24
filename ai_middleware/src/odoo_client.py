@@ -1,6 +1,5 @@
 import requests
 import json
-import websockets
 import asyncio
 from typing import Dict, Any, Optional
 
@@ -390,52 +389,67 @@ class OdooClient:
             print(f"Error checking agent status: {e}")
             return {"active": False, "reason": "error"}
     
-    async def connect_to_odoo_websocket(self, session_id: int):
-        """Connect to Odoo's WebSocket bus for real-time notifications"""
-        try:
-            # Get WebSocket URL from Odoo
-            ws_url = f"{self.url.replace('https://', 'wss://').replace('http://', 'ws://')}/websocket"
-            
-            # Connect to Odoo WebSocket
-            websocket = await websockets.connect(
-                ws_url,
-                extra_headers={
-                    'Cookie': '; '.join([f'{k}={v}' for k, v in self.session.cookies.items()])
-                }
-            )
-            
-            # Subscribe to channel notifications
-            subscribe_msg = {
-                "event_name": "subscribe",
-                "data": {
-                    "channels": [f"discuss.channel_{session_id}"]
-                }
-            }
-            
-            await websocket.send(json.dumps(subscribe_msg))
-            print(f"⚡ Connected to Odoo WebSocket for session {session_id}")
-            
-            return websocket
-            
-        except Exception as e:
-            print(f"❌ Failed to connect to Odoo WebSocket: {e}")
-            # Fallback: try alternative WebSocket endpoint
+    async def start_longpolling_listener(self, session_id: int, callback):
+        """Start longpolling listener for real-time notifications"""
+        last_notification_id = 0
+        
+        while True:
             try:
-                ws_url = f"{self.url.replace('https://', 'wss://').replace('http://', 'ws://')}/longpolling/websocket"
-                websocket = await websockets.connect(ws_url)
+                # Use Odoo's longpolling for real-time notifications
+                longpoll_data = {
+                    "jsonrpc": "2.0",
+                    "method": "call",
+                    "params": {
+                        "channels": [f"discuss.channel_{session_id}"],
+                        "last": last_notification_id,
+                        "options": {"bus_inactivity": 60000}
+                    },
+                    "id": 10
+                }
                 
-                # Send subscription
-                await websocket.send(json.dumps({
-                    "type": "subscribe",
-                    "channels": [f"discuss.channel_{session_id}"]
-                }))
+                # Long polling request (waits for notifications)
+                response = self.session.post(
+                    f"{self.url}/longpolling/poll", 
+                    json=longpoll_data, 
+                    timeout=65  # Slightly longer than bus_inactivity
+                )
                 
-                print(f"⚡ Connected to Odoo WebSocket (fallback) for session {session_id}")
-                return websocket
+                if response.status_code == 200:
+                    result = response.json()
+                    notifications = result.get('result', [])
+                    
+                    for notification in notifications:
+                        if len(notification) >= 3:
+                            channel, message_data, notif_id = notification[0], notification[1], notification[2]
+                            
+                            if f"discuss.channel_{session_id}" in str(channel):
+                                if isinstance(message_data, dict):
+                                    # Check if it's a new message from agent
+                                    if (message_data.get('type') == 'mail.message' and 
+                                        message_data.get('author_id') and 
+                                        'visitor@livechat.com' not in str(message_data.get('email_from', ''))):
+                                        
+                                        await callback({
+                                            'type': 'message',
+                                            'data': {
+                                                'id': message_data.get('id'),
+                                                'body': message_data.get('body', '').replace('<p>', '').replace('</p>', ''),
+                                                'author': message_data.get('author_id', [None, 'Agent'])[1] if isinstance(message_data.get('author_id'), list) else 'Agent',
+                                                'date': message_data.get('date')
+                                            }
+                                        })
+                            
+                            last_notification_id = max(last_notification_id, notif_id)
                 
-            except Exception as e2:
-                print(f"❌ WebSocket fallback also failed: {e2}")
-                return None
+                await asyncio.sleep(0.1)  # Brief pause before next longpoll
+                
+            except asyncio.TimeoutError:
+                # Timeout is normal for longpolling, just continue
+                continue
+            except Exception as e:
+                print(f"❌ Longpolling error for session {session_id}: {e}")
+                await asyncio.sleep(2)
+                continue
     
     def store_feedback(self, session_id: int, rating: str, comment: str = "") -> bool:
         """Store feedback for a chat session in Odoo"""
