@@ -47,12 +47,12 @@ class WebSocketManager:
         return False
     
     async def _monitor_session(self, session_id: int):
-        """Monitor Odoo session for new messages"""
-        last_message_id = 0
+        """Monitor session using Odoo bus notifications"""
+        print(f"🔄 Starting real-time monitoring for session {session_id}")
         
         while session_id in self.connections:
             try:
-                # Check if session is still active
+                # Check session status only
                 if not self.odoo_client.is_session_active(session_id):
                     await self.send_message(session_id, {
                         "type": "session_ended",
@@ -60,30 +60,28 @@ class WebSocketManager:
                     })
                     break
                 
-                # Get new messages
-                messages = self.odoo_client.get_session_messages(session_id)
-                if messages:
-                    for msg in messages:
-                        if msg['id'] > last_message_id:
-                            if msg['body'] == 'SESSION_ENDED':
-                                await self.send_message(session_id, {
-                                    "type": "session_ended",
-                                    "message": "Agent has left the chat"
-                                })
-                                return
-                            else:
-                                await self.send_message(session_id, {
-                                    "type": "message",
-                                    "data": msg
-                                })
-                            last_message_id = max(last_message_id, msg['id'])
+                # Use Odoo's longpolling for real-time updates
+                notifications = self.odoo_client.get_bus_notifications(session_id)
+                if notifications:
+                    for notification in notifications:
+                        if notification.get('type') == 'new_message':
+                            await self.send_message(session_id, {
+                                "type": "message",
+                                "data": notification['message']
+                            })
+                        elif notification.get('type') == 'session_ended':
+                            await self.send_message(session_id, {
+                                "type": "session_ended",
+                                "message": "Agent has left the chat"
+                            })
+                            return
                 
-                await asyncio.sleep(2)  # Check every 2 seconds
+                await asyncio.sleep(1)  # Minimal check interval
                 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 print(f"❌ Monitor error for session {session_id}: {e}")
-                await asyncio.sleep(5)
+                await asyncio.sleep(3)
         
         self.disconnect(session_id)

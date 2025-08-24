@@ -113,19 +113,9 @@ async def handle_chat(chat_message: ChatMessage):
         print(f"Chat error: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 
-@app.get("/messages/{session_id}")
-async def get_messages(session_id: int):
-    """Get new messages from Odoo live chat session"""
-    try:
-        messages = odoo_client.get_session_messages(session_id)
-        return {"messages": messages}
-    except Exception as e:
-        print(f"Error getting messages: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting messages: {str(e)}")
-
 @app.get("/session/{session_id}/status")
 async def get_session_status(session_id: int):
-    """Check if session is still active"""
+    """Check if session is still active (minimal check only)"""
     try:
         is_active = odoo_client.is_session_active(session_id)
         return {"active": is_active}
