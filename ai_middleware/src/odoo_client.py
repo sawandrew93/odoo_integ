@@ -98,35 +98,14 @@ class OdooClient:
         return None
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
-        """Send message as visitor with instant Odoo notification"""
+        """Send message as visitor with instant notification"""
         try:
             if not self.is_session_active(session_id):
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
-            # Send message using Odoo's livechat method for instant notification
+            # Send message and trigger notification
             message_data = {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "model": "im_livechat.channel",
-                    "method": "send_visitor_message",
-                    "args": [1, session_id, message, author_name],
-                    "kwargs": {}
-                },
-                "id": 3
-            }
-            
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('result') is not False:
-                    print(f"⚡ Instant message sent to session {session_id}")
-                    return True
-            
-            # Fallback to regular message_post
-            fallback_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
@@ -140,15 +119,19 @@ class OdooClient:
                         "email_from": f"{author_name} <visitor@livechat.com>"
                     }
                 },
-                "id": 4
+                "id": 3
             }
             
-            fallback_response = self.session.post(f"{self.url}/web/dataset/call_kw", json=fallback_data)
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
             
-            if fallback_response.status_code == 200:
-                fallback_result = fallback_response.json()
-                if fallback_result.get('result'):
-                    print(f"✅ Message sent to session {session_id} (fallback)")
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    message_id = result['result']
+                    print(f"✅ Message sent to session {session_id}, ID: {message_id}")
+                    
+                    # Trigger bus notification for instant delivery
+                    self._trigger_notification(session_id, message_id)
                     return True
             
             print(f"❌ Failed to send message to session {session_id}")
@@ -157,6 +140,46 @@ class OdooClient:
         except Exception as e:
             print(f"Error sending message: {e}")
             return False
+    
+    def _trigger_notification(self, session_id: int, message_id: int):
+        """Trigger bus notification for instant message delivery"""
+        try:
+            # Method 1: Trigger channel notification
+            notify_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "_broadcast",
+                    "args": [session_id, ["discuss.channel", session_id]],
+                    "kwargs": {}
+                },
+                "id": 4
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=notify_data)
+            if response.status_code == 200:
+                print(f"⚡ Notification triggered for session {session_id}")
+                return
+            
+            # Method 2: Update channel to trigger notification
+            update_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "write",
+                    "args": [[session_id], {"message_needaction_counter": 1}],
+                    "kwargs": {}
+                },
+                "id": 5
+            }
+            
+            self.session.post(f"{self.url}/web/dataset/call_kw", json=update_data)
+            print(f"⚡ Channel updated for session {session_id}")
+            
+        except Exception as e:
+            print(f"Error triggering notification: {e}")
     
 
 
@@ -391,64 +414,57 @@ class OdooClient:
     
     async def start_longpolling_listener(self, session_id: int, callback):
         """Start longpolling listener for real-time notifications"""
-        last_notification_id = 0
+        last_message_id = 0
         
         while True:
             try:
-                # Use Odoo's longpolling for real-time notifications
-                longpoll_data = {
+                # Simple approach: check for new agent messages
+                message_data = {
                     "jsonrpc": "2.0",
                     "method": "call",
                     "params": {
-                        "channels": [f"discuss.channel_{session_id}"],
-                        "last": last_notification_id,
-                        "options": {"bus_inactivity": 60000}
+                        "model": "mail.message",
+                        "method": "search_read",
+                        "args": [[
+                            ["res_id", "=", session_id], 
+                            ["model", "=", "discuss.channel"],
+                            ["id", ">", last_message_id],
+                            ["author_id", "!=", False]
+                        ], ["id", "body", "author_id", "date", "email_from"]],
+                        "kwargs": {"order": "date asc", "limit": 5}
                     },
-                    "id": 10
+                    "id": 6
                 }
                 
-                # Long polling request (waits for notifications)
-                response = self.session.post(
-                    f"{self.url}/longpolling/poll", 
-                    json=longpoll_data, 
-                    timeout=65  # Slightly longer than bus_inactivity
-                )
+                response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
                 
                 if response.status_code == 200:
                     result = response.json()
-                    notifications = result.get('result', [])
                     
-                    for notification in notifications:
-                        if len(notification) >= 3:
-                            channel, message_data, notif_id = notification[0], notification[1], notification[2]
-                            
-                            if f"discuss.channel_{session_id}" in str(channel):
-                                if isinstance(message_data, dict):
-                                    # Check if it's a new message from agent
-                                    if (message_data.get('type') == 'mail.message' and 
-                                        message_data.get('author_id') and 
-                                        'visitor@livechat.com' not in str(message_data.get('email_from', ''))):
-                                        
-                                        await callback({
-                                            'type': 'message',
-                                            'data': {
-                                                'id': message_data.get('id'),
-                                                'body': message_data.get('body', '').replace('<p>', '').replace('</p>', ''),
-                                                'author': message_data.get('author_id', [None, 'Agent'])[1] if isinstance(message_data.get('author_id'), list) else 'Agent',
-                                                'date': message_data.get('date')
-                                            }
-                                        })
-                            
-                            last_notification_id = max(last_notification_id, notif_id)
+                    if result.get('result'):
+                        for msg in result['result']:
+                            # Skip visitor messages
+                            if not (msg.get('email_from') and 'visitor@livechat.com' in msg['email_from']):
+                                import re
+                                clean_body = re.sub(r'<[^>]+>', '', msg['body'])
+                                
+                                await callback({
+                                    'type': 'message',
+                                    'data': {
+                                        'id': msg['id'],
+                                        'body': clean_body,
+                                        'author': msg['author_id'][1] if isinstance(msg['author_id'], list) else 'Agent',
+                                        'date': msg['date']
+                                    }
+                                })
+                                
+                                last_message_id = max(last_message_id, msg['id'])
                 
-                await asyncio.sleep(0.1)  # Brief pause before next longpoll
+                await asyncio.sleep(1)  # Check every second for agent messages
                 
-            except asyncio.TimeoutError:
-                # Timeout is normal for longpolling, just continue
-                continue
             except Exception as e:
-                print(f"❌ Longpolling error for session {session_id}: {e}")
-                await asyncio.sleep(2)
+                print(f"❌ Message check error for session {session_id}: {e}")
+                await asyncio.sleep(3)
                 continue
     
     def store_feedback(self, session_id: int, rating: str, comment: str = "") -> bool:
