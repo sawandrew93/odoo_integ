@@ -213,7 +213,7 @@
                         sortedMessages.forEach(msg => {
                             if (msg.id > lastMessageId) {
                                 // Check if agent left the conversation
-                                if (msg.body.includes('left the conversation')) {
+                                if (msg.body.includes('left the channel') || msg.body.includes('left the conversation')) {
                                     addMessage(`${msg.author}: ${msg.body}`, false);
                                     sessionEnded = true;
                                     messageInput.disabled = true;
@@ -243,7 +243,7 @@
             }, 1500); // Poll every 1.5 seconds for faster detection
         }
         
-        function showFeedbackSurvey() {
+        window.showFeedbackSurvey = function() {
             const surveyDiv = document.createElement('div');
             surveyDiv.innerHTML = `
                 <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; border: 1px solid #dee2e6;">
@@ -259,12 +259,12 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
         
-        function submitFeedback(rating) {
+        window.submitFeedback = function(rating) {
             addMessage(`Thank you for your feedback! (${rating})`, false, false, true);
             closeSurvey();
         }
         
-        function closeSurvey() {
+        window.closeSurvey = function() {
             const survey = messagesDiv.querySelector('div[style*="background: #f8f9fa"]');
             if (survey) survey.remove();
         }
