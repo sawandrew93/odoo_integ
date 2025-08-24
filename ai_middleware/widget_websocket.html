@@ -124,9 +124,16 @@
                 websocket = new WebSocket(`${WS_BASE}/ws/${sessionId}`);
                 
                 websocket.onopen = () => {
-                    console.log('WebSocket connected');
+                    console.log('✅ WebSocket connected - stopping polling');
                     updateConnectionStatus('ws-connected', 'Real-time connected');
                     reconnectAttempts = 0;
+                    
+                    // Stop polling since WebSocket is working
+                    if (pollingInterval) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        console.log('📡 Polling stopped - using WebSocket');
+                    }
                     
                     // Send ping every 30 seconds to keep connection alive
                     setInterval(() => {
@@ -187,8 +194,9 @@
         }
 
         function startPolling() {
-            if (pollingInterval || !sessionId || sessionEnded) return;
+            if (pollingInterval || !sessionId || sessionEnded || websocket) return;
             
+            console.log('📡 Starting polling mode (WebSocket not available)');
             pollingInterval = setInterval(async () => {
                 try {
                     // Check session status

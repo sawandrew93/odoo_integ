@@ -189,6 +189,15 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "AI Middleware"}
 
+@app.get("/connections")
+async def get_connections():
+    """Get active WebSocket connections"""
+    return {
+        "websocket_connections": len(ws_manager.connections),
+        "active_sessions": list(ws_manager.connections.keys()),
+        "monitoring_tasks": len(ws_manager.tasks)
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
