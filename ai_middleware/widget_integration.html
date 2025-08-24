@@ -240,7 +240,7 @@
                 } catch (error) {
                     console.error('Polling error:', error);
                 }
-            }, 1500); // Poll every 1.5 seconds for faster detection
+            }, 30000); // Poll every 30 seconds to reduce API load
         }
         
         window.showFeedbackSurvey = function() {
