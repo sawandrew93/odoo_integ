@@ -1,14 +1,14 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, Dict
+from typing import Optional
 import os
-import asyncio
 import json
 from dotenv import load_dotenv
 
 from .odoo_client import OdooClient
 from .ai_agent import AIAgent
+from .websocket_manager import WebSocketManager
 
 load_dotenv()
 
@@ -41,73 +41,8 @@ knowledge_dir = os.path.join(os.path.dirname(__file__), '..', 'knowledge')
 if os.path.exists(knowledge_dir):
     ai_agent.load_knowledge_base(knowledge_dir)
 
-# WebSocket connection manager
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: Dict[int, WebSocket] = {}
-        self.session_tasks: Dict[int, asyncio.Task] = {}
-    
-    async def connect(self, websocket: WebSocket, session_id: int):
-        await websocket.accept()
-        self.active_connections[session_id] = websocket
-        # Start monitoring task for this session
-        task = asyncio.create_task(self.monitor_session(session_id))
-        self.session_tasks[session_id] = task
-    
-    def disconnect(self, session_id: int):
-        if session_id in self.active_connections:
-            del self.active_connections[session_id]
-        if session_id in self.session_tasks:
-            self.session_tasks[session_id].cancel()
-            del self.session_tasks[session_id]
-    
-    async def send_message(self, session_id: int, message: dict):
-        if session_id in self.active_connections:
-            try:
-                await self.active_connections[session_id].send_text(json.dumps(message))
-            except:
-                self.disconnect(session_id)
-    
-    async def monitor_session(self, session_id: int):
-        last_message_id = 0
-        while session_id in self.active_connections:
-            try:
-                # Check session status
-                is_active = odoo_client.is_session_active(session_id)
-                if not is_active:
-                    await self.send_message(session_id, {
-                        "type": "session_ended",
-                        "message": "Agent has left the chat"
-                    })
-                    break
-                
-                # Get new messages
-                messages = odoo_client.get_session_messages(session_id)
-                if messages:
-                    new_messages = [msg for msg in messages if msg['id'] > last_message_id]
-                    if new_messages:
-                        for msg in new_messages:
-                            if msg['body'] == 'SESSION_ENDED':
-                                await self.send_message(session_id, {
-                                    "type": "session_ended",
-                                    "message": "Agent has left the chat"
-                                })
-                                return
-                            else:
-                                await self.send_message(session_id, {
-                                    "type": "message",
-                                    "data": msg
-                                })
-                            last_message_id = max(last_message_id, msg['id'])
-                
-                await asyncio.sleep(2)  # Check every 2 seconds
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                print(f"Monitor error for session {session_id}: {e}")
-                await asyncio.sleep(5)
-
-manager = ConnectionManager()
+# Initialize WebSocket manager
+ws_manager = WebSocketManager(odoo_client)
 
 class ChatMessage(BaseModel):
     message: str
@@ -227,11 +162,11 @@ async def submit_feedback(feedback: FeedbackRequest):
 async def websocket_endpoint(websocket: WebSocket, session_id: int):
     """WebSocket endpoint for real-time chat updates"""
     try:
-        await manager.connect(websocket, session_id)
-        # Keep connection alive and handle incoming messages
+        await ws_manager.connect(websocket, session_id)
+        
+        # Keep connection alive and handle ping/pong
         while True:
             try:
-                # Wait for messages from client (like ping/pong)
                 data = await websocket.receive_text()
                 message = json.loads(data)
                 
@@ -241,13 +176,13 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
             except WebSocketDisconnect:
                 break
             except Exception as e:
-                print(f"WebSocket message error: {e}")
+                print(f"WebSocket error: {e}")
                 break
                 
     except Exception as e:
-        print(f"WebSocket connection error: {e}")
+        print(f"WebSocket connection failed: {e}")
     finally:
-        manager.disconnect(session_id)
+        ws_manager.disconnect(session_id)
 
 @app.get("/health")
 async def health_check():
