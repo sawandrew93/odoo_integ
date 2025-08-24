@@ -212,14 +212,19 @@
                         
                         sortedMessages.forEach(msg => {
                             if (msg.id > lastMessageId) {
-                                // Handle system messages
-                                if (msg.body === 'SESSION_ENDED' || msg.body === 'AGENT_DISCONNECTED') {
-                                    addMessage('Agent has left the chat', false, false, true);
+                                // Check if agent left the conversation
+                                if (msg.body.includes('left the conversation')) {
+                                    addMessage(`${msg.author}: ${msg.body}`, false);
                                     sessionEnded = true;
                                     messageInput.disabled = true;
                                     sendBtn.disabled = true;
                                     clearInterval(pollingInterval);
                                     pollingInterval = null;
+                                    
+                                    // Show feedback survey after 2 seconds
+                                    setTimeout(() => {
+                                        showFeedbackSurvey();
+                                    }, 2000);
                                 } else {
                                     // Check if agent just joined
                                     if (!agentJoined && msg.author !== 'Anonymous' && msg.author !== 'System') {
@@ -236,6 +241,32 @@
                     console.error('Polling error:', error);
                 }
             }, 1500); // Poll every 1.5 seconds for faster detection
+        }
+        
+        function showFeedbackSurvey() {
+            const surveyDiv = document.createElement('div');
+            surveyDiv.innerHTML = `
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; border: 1px solid #dee2e6;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold;">How was your chat experience?</p>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <button onclick="submitFeedback('good')" style="padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">👍 Good</button>
+                        <button onclick="submitFeedback('bad')" style="padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">👎 Bad</button>
+                    </div>
+                    <button onclick="closeSurvey()" style="padding: 3px 8px; background: #6c757d; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">Skip</button>
+                </div>
+            `;
+            messagesDiv.appendChild(surveyDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function submitFeedback(rating) {
+            addMessage(`Thank you for your feedback! (${rating})`, false, false, true);
+            closeSurvey();
+        }
+        
+        function closeSurvey() {
+            const survey = messagesDiv.querySelector('div[style*="background: #f8f9fa"]');
+            if (survey) survey.remove();
         }
         
         // Initialize
