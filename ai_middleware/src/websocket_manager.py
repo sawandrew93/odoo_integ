@@ -47,35 +47,61 @@ class WebSocketManager:
         return False
     
     async def _monitor_session(self, session_id: int):
-        """Monitor session with minimal polling for agent messages only"""
-        last_message_id = 0
+        """Monitor session using Odoo's native WebSocket bus"""
+        print(f"⚡ Starting WebSocket monitoring for session {session_id}")
         
-        while session_id in self.connections:
-            try:
-                # Check session status
-                if not self.odoo_client.is_session_active(session_id):
-                    await self.send_message(session_id, {
-                        "type": "session_ended",
-                        "message": "Agent has left the chat"
-                    })
-                    break
-                
-                # Get only agent messages (not visitor messages)
-                messages = self.odoo_client.get_agent_messages_only(session_id, last_message_id)
-                if messages:
-                    for msg in messages:
+        # Subscribe to Odoo's WebSocket bus for this channel
+        odoo_ws = await self.odoo_client.connect_to_odoo_websocket(session_id)
+        
+        if not odoo_ws:
+            print(f"❌ Failed to connect to Odoo WebSocket for session {session_id}")
+            self.disconnect(session_id)
+            return
+        
+        try:
+            while session_id in self.connections:
+                try:
+                    # Listen for real-time messages from Odoo WebSocket
+                    message = await odoo_ws.recv()
+                    data = json.loads(message)
+                    
+                    if data.get('type') == 'mail.message':
+                        # New message from agent
+                        msg_data = data.get('payload', {})
+                        if msg_data.get('author_id') and 'visitor@livechat.com' not in str(msg_data.get('email_from', '')):
+                            await self.send_message(session_id, {
+                                "type": "message",
+                                "data": {
+                                    'id': msg_data.get('id'),
+                                    'body': msg_data.get('body', '').replace('<p>', '').replace('</p>', ''),
+                                    'author': msg_data.get('author_id', [None, 'Agent'])[1] if isinstance(msg_data.get('author_id'), list) else 'Agent',
+                                    'date': msg_data.get('date')
+                                }
+                            })
+                    
+                    elif data.get('type') == 'channel.ended':
                         await self.send_message(session_id, {
-                            "type": "message",
-                            "data": msg
+                            "type": "session_ended",
+                            "message": "Agent has left the chat"
                         })
-                        last_message_id = max(last_message_id, msg['id'])
-                
-                await asyncio.sleep(2)  # Check every 2 seconds for agent messages only
-                
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                print(f"❌ Monitor error for session {session_id}: {e}")
-                await asyncio.sleep(5)
-        
-        self.disconnect(session_id)
+                        break
+                        
+                except asyncio.TimeoutError:
+                    # Check if session is still active periodically
+                    if not self.odoo_client.is_session_active(session_id):
+                        await self.send_message(session_id, {
+                            "type": "session_ended",
+                            "message": "Agent has left the chat"
+                        })
+                        break
+                        
+                except Exception as e:
+                    print(f"❌ WebSocket message error for session {session_id}: {e}")
+                    await asyncio.sleep(1)
+                    
+        except Exception as e:
+            print(f"❌ WebSocket monitoring error for session {session_id}: {e}")
+        finally:
+            if odoo_ws:
+                await odoo_ws.close()
+            self.disconnect(session_id)

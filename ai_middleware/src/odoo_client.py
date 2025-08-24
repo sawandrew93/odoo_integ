@@ -1,5 +1,7 @@
 import requests
 import json
+import websockets
+import asyncio
 from typing import Dict, Any, Optional
 
 class OdooClient:
@@ -97,14 +99,35 @@ class OdooClient:
         return None
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
-        """Send message as visitor to the live chat session"""
+        """Send message as visitor with instant Odoo notification"""
         try:
             if not self.is_session_active(session_id):
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
-            # Send message as visitor
+            # Send message using Odoo's livechat method for instant notification
             message_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "im_livechat.channel",
+                    "method": "send_visitor_message",
+                    "args": [1, session_id, message, author_name],
+                    "kwargs": {}
+                },
+                "id": 3
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result') is not False:
+                    print(f"⚡ Instant message sent to session {session_id}")
+                    return True
+            
+            # Fallback to regular message_post
+            fallback_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
@@ -118,50 +141,26 @@ class OdooClient:
                         "email_from": f"{author_name} <visitor@livechat.com>"
                     }
                 },
-                "id": 3
+                "id": 4
             }
             
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            fallback_response = self.session.post(f"{self.url}/web/dataset/call_kw", json=fallback_data)
             
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('result'):
-                    print(f"✅ Message sent to session {session_id}")
+            if fallback_response.status_code == 200:
+                fallback_result = fallback_response.json()
+                if fallback_result.get('result'):
+                    print(f"✅ Message sent to session {session_id} (fallback)")
                     return True
-                else:
-                    print(f"❌ Failed to send message: {result}")
-                    return False
-            else:
-                print(f"HTTP {response.status_code} when sending message")
-                return False
+            
+            print(f"❌ Failed to send message to session {session_id}")
+            return False
             
         except Exception as e:
             print(f"Error sending message: {e}")
             return False
     
 
-    
-    def notify_agent(self, session_id: int):
-        """Send notification to agent about new message"""
-        try:
-            notify_data = {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "model": "discuss.channel",
-                    "method": "_notify_thread",
-                    "args": [session_id],
-                    "kwargs": {}
-                },
-                "id": 5
-            }
-            
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=notify_data)
-            if response.status_code == 200:
-                print(f"✅ Agent notification sent for session {session_id}")
-            
-        except Exception as e:
-            print(f"Error notifying agent: {e}")
+
     
     def get_session_messages(self, session_id: int):
         """Get messages from live chat session"""
@@ -391,55 +390,52 @@ class OdooClient:
             print(f"Error checking agent status: {e}")
             return {"active": False, "reason": "error"}
     
-    def get_agent_messages_only(self, session_id: int, last_message_id: int):
-        """Get only agent messages (not visitor messages)"""
+    async def connect_to_odoo_websocket(self, session_id: int):
+        """Connect to Odoo's WebSocket bus for real-time notifications"""
         try:
-            message_data = {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "model": "mail.message",
-                    "method": "search_read",
-                    "args": [[
-                        ["res_id", "=", session_id], 
-                        ["model", "=", "discuss.channel"],
-                        ["id", ">", last_message_id],
-                        ["author_id", "!=", False]  # Only messages with author (agent messages)
-                    ], ["id", "body", "author_id", "date", "email_from"]],
-                    "kwargs": {
-                        "order": "date asc",
-                        "limit": 10
-                    }
-                },
-                "id": 6
+            # Get WebSocket URL from Odoo
+            ws_url = f"{self.url.replace('https://', 'wss://').replace('http://', 'ws://')}/websocket"
+            
+            # Connect to Odoo WebSocket
+            websocket = await websockets.connect(
+                ws_url,
+                extra_headers={
+                    'Cookie': '; '.join([f'{k}={v}' for k, v in self.session.cookies.items()])
+                }
+            )
+            
+            # Subscribe to channel notifications
+            subscribe_msg = {
+                "event_name": "subscribe",
+                "data": {
+                    "channels": [f"discuss.channel_{session_id}"]
+                }
             }
             
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            await websocket.send(json.dumps(subscribe_msg))
+            print(f"⚡ Connected to Odoo WebSocket for session {session_id}")
             
-            if response.status_code == 200:
-                result = response.json()
-                
-                if result.get('result'):
-                    messages = []
-                    for msg in result['result']:
-                        # Skip visitor messages
-                        if not (msg.get('email_from') and 'visitor@livechat.com' in msg['email_from']):
-                            import re
-                            clean_body = re.sub(r'<[^>]+>', '', msg['body'])
-                            messages.append({
-                                'id': msg['id'],
-                                'body': clean_body,
-                                'author': msg['author_id'][1] if isinstance(msg['author_id'], list) else 'Agent',
-                                'date': msg['date']
-                            })
-                    
-                    return messages
-            
-            return []
+            return websocket
             
         except Exception as e:
-            print(f"Error getting agent messages: {e}")
-            return []
+            print(f"❌ Failed to connect to Odoo WebSocket: {e}")
+            # Fallback: try alternative WebSocket endpoint
+            try:
+                ws_url = f"{self.url.replace('https://', 'wss://').replace('http://', 'ws://')}/longpolling/websocket"
+                websocket = await websockets.connect(ws_url)
+                
+                # Send subscription
+                await websocket.send(json.dumps({
+                    "type": "subscribe",
+                    "channels": [f"discuss.channel_{session_id}"]
+                }))
+                
+                print(f"⚡ Connected to Odoo WebSocket (fallback) for session {session_id}")
+                return websocket
+                
+            except Exception as e2:
+                print(f"❌ WebSocket fallback also failed: {e2}")
+                return None
     
     def store_feedback(self, session_id: int, rating: str, comment: str = "") -> bool:
         """Store feedback for a chat session in Odoo"""
