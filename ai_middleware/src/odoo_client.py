@@ -97,14 +97,13 @@ class OdooClient:
         return None
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
-        """Send message as visitor to the live chat session with instant notification"""
+        """Send message as visitor to the live chat session"""
         try:
-            # First check if session is still active
             if not self.is_session_active(session_id):
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
-            # Send message as visitor with immediate bus notification
+            # Send message as visitor
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -116,8 +115,7 @@ class OdooClient:
                         "body": message,
                         "message_type": "comment",
                         "author_id": False,
-                        "email_from": f"{author_name} <visitor@livechat.com>",
-                        "notify_followers": True  # Ensure notification
+                        "email_from": f"{author_name} <visitor@livechat.com>"
                     }
                 },
                 "id": 3
@@ -129,9 +127,6 @@ class OdooClient:
                 result = response.json()
                 if result.get('result'):
                     print(f"✅ Message sent to session {session_id}")
-                    
-                    # Force immediate notification via bus
-                    self.trigger_bus_notification(session_id, result['result'])
                     return True
                 else:
                     print(f"❌ Failed to send message: {result}")
@@ -144,32 +139,7 @@ class OdooClient:
             print(f"Error sending message: {e}")
             return False
     
-    def trigger_bus_notification(self, session_id: int, message_id: int):
-        """Trigger immediate bus notification for new message"""
-        try:
-            # Trigger bus notification for real-time delivery
-            bus_data = {
-                "jsonrpc": "2.0",
-                "method": "call",
-                "params": {
-                    "model": "bus.bus",
-                    "method": "_sendone",
-                    "args": [f"discuss.channel_{session_id}", "mail.message", {
-                        "id": message_id,
-                        "type": "mail.message",
-                        "channel_id": session_id
-                    }],
-                    "kwargs": {}
-                },
-                "id": 4
-            }
-            
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=bus_data)
-            if response.status_code == 200:
-                print(f"⚡ Bus notification triggered for session {session_id}")
-            
-        except Exception as e:
-            print(f"Error triggering bus notification: {e}")
+
     
     def notify_agent(self, session_id: int):
         """Send notification to agent about new message"""
@@ -421,53 +391,54 @@ class OdooClient:
             print(f"Error checking agent status: {e}")
             return {"active": False, "reason": "error"}
     
-    def get_bus_notifications(self, session_id: int):
-        """Get real-time notifications from Odoo bus system"""
+    def get_agent_messages_only(self, session_id: int, last_message_id: int):
+        """Get only agent messages (not visitor messages)"""
         try:
-            # Use Odoo's longpolling bus for real-time notifications
-            bus_data = {
+            message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "channels": [f"discuss.channel_{session_id}"],
-                    "last": 0,
-                    "options": {"bus_inactivity": 60000}
+                    "model": "mail.message",
+                    "method": "search_read",
+                    "args": [[
+                        ["res_id", "=", session_id], 
+                        ["model", "=", "discuss.channel"],
+                        ["id", ">", last_message_id],
+                        ["author_id", "!=", False]  # Only messages with author (agent messages)
+                    ], ["id", "body", "author_id", "date", "email_from"]],
+                    "kwargs": {
+                        "order": "date asc",
+                        "limit": 10
+                    }
                 },
-                "id": 10
+                "id": 6
             }
             
-            response = self.session.post(f"{self.url}/longpolling/poll", json=bus_data, timeout=5)
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
             
             if response.status_code == 200:
                 result = response.json()
-                notifications = result.get('result', [])
                 
-                processed_notifications = []
-                for notification in notifications:
-                    if len(notification) >= 2:
-                        channel, message_data = notification[0], notification[1]
-                        if f"discuss.channel_{session_id}" in str(channel):
-                            if isinstance(message_data, dict) and message_data.get('type') == 'mail.message':
-                                # New message notification
-                                processed_notifications.append({
-                                    'type': 'new_message',
-                                    'message': {
-                                        'id': message_data.get('id'),
-                                        'body': message_data.get('body', ''),
-                                        'author': message_data.get('author_id', ['', 'Agent'])[1],
-                                        'date': message_data.get('date')
-                                    }
-                                })
-                
-                return processed_notifications
+                if result.get('result'):
+                    messages = []
+                    for msg in result['result']:
+                        # Skip visitor messages
+                        if not (msg.get('email_from') and 'visitor@livechat.com' in msg['email_from']):
+                            import re
+                            clean_body = re.sub(r'<[^>]+>', '', msg['body'])
+                            messages.append({
+                                'id': msg['id'],
+                                'body': clean_body,
+                                'author': msg['author_id'][1] if isinstance(msg['author_id'], list) else 'Agent',
+                                'date': msg['date']
+                            })
+                    
+                    return messages
             
             return []
             
         except Exception as e:
-            # Fallback to message polling if bus fails
-            messages = self.get_session_messages(session_id)
-            if messages:
-                return [{'type': 'new_message', 'message': msg} for msg in messages[-1:]]
+            print(f"Error getting agent messages: {e}")
             return []
     
     def store_feedback(self, session_id: int, rating: str, comment: str = "") -> bool:
