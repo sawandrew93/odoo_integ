@@ -91,7 +91,8 @@ async def handle_chat(chat_message: ChatMessage):
         # Process message with AI agent
         handoff_needed, ai_response, confidence = ai_agent.should_handoff(
             chat_message.message, 
-            chat_message.context
+            chat_message.context,
+            chat_message.session_id
         )
         
         odoo_session_id = None
