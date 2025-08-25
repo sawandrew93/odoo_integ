@@ -44,16 +44,16 @@ class AIAgent:
             
             ai_answer = response.text.strip()
             
-            # Check if AI suggests handoff
-            handoff_phrases = ['connect you with', 'human agent', 'transfer you', 'speak with someone']
+            # Check if AI suggests handoff or says it doesn't know
+            handoff_phrases = ['connect you with', 'human agent', 'transfer you', 'speak with someone', "don't have", "don't know", "not sure", "unable to"]
             if any(phrase in ai_answer.lower() for phrase in handoff_phrases):
-                return True, "Let me connect you with one of our human agents who can better assist you.", 0.0
+                return True, "I'm sorry I don't have information about that. Would you like me to connect you with our support representative who can better assist you?", 0.0
             
-            # If no relevant docs and not a greeting, consider handoff
+            # If no relevant docs and not a greeting, offer handoff
             if not relevant_docs or relevant_docs[0][1] < 0.3:
-                greeting_words = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening']
+                greeting_words = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening', 'how are you']
                 if not any(word in message.lower() for word in greeting_words):
-                    return True, "I'd like to connect you with one of our human agents who can better help with your specific question.", 0.0
+                    return True, "I'm sorry, I don't have any information about that. Would you like me to connect you with our support representative?", 0.0
             
             return False, ai_answer, 0.8
             
