@@ -41,7 +41,3 @@ class AIAgent:
         
         # For unknown questions, offer handoff
         return True, "I'm sorry, I don't have information about that. Would you like me to connect you with our support representative?", 0.0
-            
-        except Exception as e:
-            print(f"AI processing error: {e}")
-            return True, "I'm having some technical difficulties. Let me connect you with a human agent.", 0.0
