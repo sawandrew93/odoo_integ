@@ -150,23 +150,40 @@ class OdooClient:
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
-            # Send message as visitor
+            # Send message as visitor using the livechat method
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "model": "discuss.channel",
-                    "method": "message_post",
-                    "args": [session_id],
-                    "kwargs": {
-                        "body": message,
-                        "message_type": "comment",
-                        "author_id": False,
-                        "email_from": f"{author_name} <visitor@example.com>"
-                    }
+                    "model": "im_livechat.channel",
+                    "method": "_send_visitor_message",
+                    "args": [session_id, message],
+                    "kwargs": {}
                 },
                 "id": 3
             }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            
+            # If that fails, try the standard message post with proper visitor format
+            if response.status_code != 200 or not response.json().get('result'):
+                message_data = {
+                    "jsonrpc": "2.0",
+                    "method": "call",
+                    "params": {
+                        "model": "discuss.channel",
+                        "method": "message_post",
+                        "args": [session_id],
+                        "kwargs": {
+                            "body": message,
+                            "message_type": "comment",
+                            "author_id": False,
+                            "email_from": f"{author_name} <noreply@visitor.com>",
+                            "subtype_xmlid": "mail.mt_comment"
+                        }
+                    },
+                    "id": 3
+                }
             
             response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
             
