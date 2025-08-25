@@ -99,10 +99,11 @@ class OdooClient:
                             if session_result.get('result') and session_result['result'] != False:
                                 session_data = session_result['result']
                                 session_id = session_data.get('channel_id')
+                                visitor_uuid = session_data.get('uuid')
                                 if session_id:
-                                    print(f"✅ Live chat session created! ID: {session_id}")
-                                    # Send the initial message
-                                    self.send_message_to_session(session_id, message, visitor_name)
+                                    print(f"✅ Live chat session created! ID: {session_id}, UUID: {visitor_uuid}")
+                                    # Send the initial message with visitor context
+                                    self.send_visitor_message(session_id, message, visitor_name, visitor_uuid)
                                     return session_id
                 else:
                     print("No live chat channels found")
@@ -111,6 +112,36 @@ class OdooClient:
         
         print("❌ Failed to create live chat session")
         return None
+    
+    def send_visitor_message(self, session_id: int, message: str, visitor_name: str, visitor_uuid: str = None) -> bool:
+        """Send message as visitor using proper livechat method"""
+        try:
+            # Use the livechat visitor message endpoint
+            message_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "channel_id": session_id,
+                    "message": message,
+                    "uuid": visitor_uuid or f"visitor_{session_id}"
+                },
+                "id": 3
+            }
+            
+            response = self.session.post(f"{self.url}/im_livechat/visitor_send_message", json=message_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    print(f"✅ Visitor message sent to session {session_id}")
+                    return True
+            
+            print(f"❌ Failed to send visitor message to session {session_id}")
+            return False
+            
+        except Exception as e:
+            print(f"Error sending visitor message: {e}")
+            return False
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
         """Send message as visitor with instant notification"""

@@ -62,9 +62,9 @@ class ChatResponse(BaseModel):
 async def handle_chat(chat_message: ChatMessage):
     """Main endpoint for handling chat messages"""
     try:
-        # If session_id exists, send message directly to Odoo
+        # If session_id exists, send message directly to Odoo as visitor
         if chat_message.session_id:
-            success = odoo_client.send_message_to_session(
+            success = odoo_client.send_visitor_message(
                 int(chat_message.session_id), 
                 chat_message.message, 
                 chat_message.visitor_name
