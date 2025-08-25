@@ -1,7 +1,7 @@
 (function() {
     const CONFIG = {
-        API_BASE: 'https://your-domain.com',
-        WS_BASE: 'wss://your-domain.com'
+        API_BASE: 'https://odoo.andrewdemo.online',
+        WS_BASE: 'wss://odoo.andrewdemo.online'
     };
 
     let sessionId = null;
