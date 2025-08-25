@@ -100,6 +100,10 @@ class OdooClient:
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
         """Send message as visitor with instant notification"""
         try:
+            if not self.is_session_active(session_id):
+                print(f"Session {session_id} is not active, cannot send message")
+                return False
+            
             # Send message and trigger notification
             message_data = {
                 "jsonrpc": "2.0",
@@ -178,19 +182,27 @@ class OdooClient:
             print(f"Error triggering notification: {e}")
     
     def is_session_active(self, session_id: int) -> bool:
-        """Check if session is still active"""
+        """Check if session is still active with comprehensive checks"""
         try:
+            # Re-authenticate if needed
             if not self.uid:
                 if not self.authenticate():
                     return False
             
+            # Get comprehensive session data
             session_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
                     "model": "discuss.channel",
                     "method": "read",
-                    "args": [[session_id], ["livechat_status", "livechat_end_dt", "livechat_operator_id"]],
+                    "args": [[session_id], [
+                        "livechat_status", 
+                        "livechat_end_dt", 
+                        "livechat_operator_id",
+                        "channel_member_ids",
+                        "is_member"
+                    ]],
                     "kwargs": {}
                 },
                 "id": 8
@@ -200,22 +212,41 @@ class OdooClient:
             
             if response.status_code == 200:
                 result = response.json()
+                
+                # Check for session expired error
+                if result.get('error') and 'Session Expired' in str(result['error']):
+                    # Re-authenticate and try again
+                    if self.authenticate():
+                        response = self.session.post(f"{self.url}/web/dataset/call_kw", json=session_data)
+                        if response.status_code == 200:
+                            result = response.json()
+                
                 if result.get('result') and len(result['result']) > 0:
                     channel_data = result['result'][0]
                     status = channel_data.get('livechat_status')
                     end_dt = channel_data.get('livechat_end_dt')
                     operator_id = channel_data.get('livechat_operator_id')
+                    member_ids = channel_data.get('channel_member_ids', [])
                     
-                    if status in ['closed', 'ended'] or end_dt:
+                    print(f"Session {session_id} active check - status: {status}, end_dt: {end_dt}, operator: {operator_id}, members: {len(member_ids)}")
+                    
+                    # Session is inactive if:
+                    # 1. Status is closed/ended
+                    # 2. Has end datetime  
+                    # 3. No operator assigned (agent left)
+                    if (status in ['closed', 'ended'] or end_dt or not operator_id):
+                        print(f"Session {session_id} is INACTIVE - status={status}, end_dt={end_dt}, operator={operator_id}")
                         return False
                     
+                    print(f"Session {session_id} is ACTIVE")
                     return True
             
-            return False
+            print(f"Session {session_id} - Cannot determine status, assuming inactive")
+            return False  # Be conservative - assume inactive if we can't check
             
         except Exception as e:
             print(f"Error checking session status: {e}")
-            return False
+            return False  # Be conservative on error
     
     async def start_longpolling_listener(self, session_id: int, callback):
         """Start longpolling listener for real-time notifications"""
