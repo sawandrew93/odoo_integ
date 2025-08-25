@@ -7,13 +7,17 @@
     let sessionId = null;
     let websocket = null;
     let sessionEnded = false;
+    let isMinimized = false;
 
     function createWidget() {
         const widget = document.createElement('div');
         widget.id = 'ai-chat-widget';
         widget.innerHTML = `
-            <div style="position:fixed;bottom:20px;right:20px;width:300px;height:400px;border:1px solid #ccc;border-radius:10px;background:white;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;flex-direction:column;z-index:9999;font-family:Arial,sans-serif;">
-                <div style="padding:10px;background:#007bff;color:white;border-radius:10px 10px 0 0;font-weight:bold;">Ask Vanguard</div>
+            <div id="chat-container" style="position:fixed;bottom:20px;right:20px;width:300px;height:400px;border:1px solid #ccc;border-radius:10px;background:white;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;flex-direction:column;z-index:9999;font-family:Arial,sans-serif;">
+                <div id="chat-header" style="padding:10px;background:#007bff;color:white;border-radius:10px 10px 0 0;font-weight:bold;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+                    <span>Ask Vanguard</span>
+                    <span id="minimize-btn" style="cursor:pointer;font-size:18px;">−</span>
+                </div>
                 <div id="chat-messages" style="flex:1;padding:10px;overflow-y:auto;border-bottom:1px solid #eee;"></div>
                 <div style="display:flex;padding:10px;">
                     <input type="text" id="message-input" placeholder="Type your message..." style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px;margin-right:8px;">
@@ -89,6 +93,21 @@
         }
     }
 
+    function toggleMinimize() {
+        const container = document.getElementById('chat-container');
+        const minimizeBtn = document.getElementById('minimize-btn');
+        
+        if (isMinimized) {
+            container.style.height = '400px';
+            minimizeBtn.textContent = '−';
+            isMinimized = false;
+        } else {
+            container.style.height = '50px';
+            minimizeBtn.textContent = '□';
+            isMinimized = true;
+        }
+    }
+
     // Initialize widget
     const widget = createWidget();
     addMessage('Hello! How can I help you today?');
@@ -97,4 +116,5 @@
     document.getElementById('message-input').onkeypress = (e) => {
         if (e.key === 'Enter') sendMessage();
     };
+    document.getElementById('minimize-btn').onclick = toggleMinimize;
 })();
