@@ -102,8 +102,8 @@ class OdooClient:
                                 visitor_uuid = session_data.get('uuid')
                                 if session_id:
                                     print(f"✅ Live chat session created! ID: {session_id}, UUID: {visitor_uuid}")
-                                    # Send the initial message with visitor context
-                                    self.send_visitor_message(session_id, message, visitor_name, visitor_uuid)
+                                    # Send the initial message using standard method
+                                    self.send_message_to_session(session_id, message, visitor_name)
                                     return session_id
                 else:
                     print("No live chat channels found")
@@ -150,7 +150,7 @@ class OdooClient:
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
-            # Send message using the proper discuss channel method
+            # Send message as visitor
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -161,7 +161,8 @@ class OdooClient:
                     "kwargs": {
                         "body": message,
                         "message_type": "comment",
-                        "subtype_xmlid": "mail.mt_comment"
+                        "author_id": False,
+                        "email_from": f"{author_name} <visitor@example.com>"
                     }
                 },
                 "id": 3
