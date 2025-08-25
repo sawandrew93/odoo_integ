@@ -36,7 +36,7 @@ class AIAgent:
             kb_content = relevant_docs[0][0]
             # Extract answer from Q&A format
             if 'A:' in kb_content:
-                answer = kb_content.split('A:')[1].strip()
+                answer = kb_content.split('A:')[1].split('Q:')[0].strip()
                 return False, answer, relevant_docs[0][1]
         
         # For unknown questions, offer handoff
