@@ -59,12 +59,13 @@ class WebSocketManager:
             
             if session_id in self.connections:
                 if data.get('type') == 'message':
-                    # Check if agent just joined
-                    if not agent_joined:
+                    # Check if this is first agent message (not visitor)
+                    author = data['data']['author']
+                    if not agent_joined and author != 'Website Visitor':
                         agent_joined = True
                         await self.send_message(session_id, {
                             "type": "agent_joined",
-                            "message": f"{data['data']['author']} joined the chat"
+                            "data": {"agent_name": author}
                         })
                     
                     await self.send_message(session_id, data)
