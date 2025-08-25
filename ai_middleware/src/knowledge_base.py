@@ -14,7 +14,7 @@ class KnowledgeBase:
         self.documents.extend(documents)
         for doc in documents:
             embedding = genai.embed_content(
-                model="models/text-embedding-001",
+                model="models/embedding-001",
                 content=doc
             )["embedding"]
             self.embeddings.append(embedding)
@@ -26,7 +26,7 @@ class KnowledgeBase:
             
         try:
             query_embedding = genai.embed_content(
-                model="models/text-embedding-001",
+                model="models/embedding-001",
                 content=query
             )["embedding"]
             

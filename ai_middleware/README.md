@@ -125,4 +125,4 @@ const ws = new WebSocket(`ws://your-server:8000/ws/${sessionId}`);
 
 ## Support
 
-This middleware provides a production-ready solution for real-time AI-powered chat with Odoo Online integration using Google Gemini 2.0 Flash and text-embedding-001.
+This middleware provides a production-ready solution for real-time AI-powered chat with Odoo Online integration using Google Gemini 2.0 Flash and embedding-001.
