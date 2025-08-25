@@ -32,7 +32,7 @@ odoo_client = OdooClient(
 )
 
 ai_agent = AIAgent(
-    api_key=os.getenv('OPENAI_API_KEY'),
+    api_key=os.getenv('GEMINI_API_KEY'),
     confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', 0.7))
 )
 

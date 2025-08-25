@@ -1,12 +1,15 @@
 import os
 from typing import Dict, Tuple, Optional
+import google.generativeai as genai
 from .knowledge_base import KnowledgeBase
 
 class AIAgent:
     def __init__(self, api_key: str, confidence_threshold: float = 0.7):
         self.api_key = api_key
         self.confidence_threshold = confidence_threshold
-        self.kb = KnowledgeBase()
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        self.kb = KnowledgeBase(api_key)
         
     def load_knowledge_base(self, directory: str):
         """Load knowledge base from directory"""
@@ -31,19 +34,16 @@ class AIAgent:
             kb_context = "\n".join([doc for doc, score in relevant_docs if score > 0.2])
             
             try:
-                from openai import OpenAI
-                client = OpenAI(api_key=self.api_key)
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": f"Answer the customer question using this context: {kb_context}"},
-                        {"role": "user", "content": message}
-                    ],
-                    max_tokens=200,
-                    temperature=0.3
+                prompt = f"Answer the customer question using this context: {kb_context}\n\nQuestion: {message}"
+                response = self.model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        max_output_tokens=200,
+                        temperature=0.3
+                    )
                 )
                 
-                ai_answer = response.choices[0].message.content.strip()
+                ai_answer = response.text.strip()
                 return False, ai_answer, 0.8
                 
             except Exception as e:

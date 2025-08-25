@@ -5,7 +5,7 @@ Real-time AI middleware that sits between your website chat widget and Odoo Onli
 ## Features
 
 - ✅ **Real-time WebSocket communication** for instant visitor experience
-- ✅ **AI-powered message routing** with OpenAI integration
+- ✅ **AI-powered message routing** with Google Gemini integration
 - ✅ **Seamless Odoo integration** with instant agent notifications
 - ✅ **Automatic feedback collection** after chat sessions
 - ✅ **Agent join/leave notifications** for better user experience
@@ -21,7 +21,7 @@ Real-time AI middleware that sits between your website chat widget and Odoo Onli
 2. **Configure Environment**
    ```bash
    cp .env.example .env
-   # Edit .env with your Odoo and OpenAI credentials
+   # Edit .env with your Odoo and Gemini credentials
    ```
 
 3. **Add Knowledge Base**
@@ -44,7 +44,7 @@ ODOO_URL=https://your-instance.odoo.com
 ODOO_DB=your-database-name
 ODOO_USERNAME=your-username
 ODOO_PASSWORD=your-password
-OPENAI_API_KEY=your-openai-api-key
+GEMINI_API_KEY=your-gemini-api-key
 CONFIDENCE_THRESHOLD=0.7
 ```
 
@@ -82,7 +82,7 @@ ai_middleware/
 ├── src/
 │   ├── main.py              # FastAPI application
 │   ├── odoo_client.py       # Odoo API integration
-│   ├── ai_agent.py          # OpenAI integration
+│   ├── ai_agent.py          # Google Gemini integration
 │   ├── knowledge_base.py    # FAQ/knowledge management
 │   └── websocket_manager.py # Real-time WebSocket handling
 ├── knowledge/
@@ -119,10 +119,10 @@ const ws = new WebSocket(`ws://your-server:8000/ws/${sessionId}`);
 
 - **WebSocket latency**: ~50ms for real-time updates
 - **Agent notification**: Instant via Odoo bus system
-- **AI response time**: ~500ms with OpenAI
+- **AI response time**: ~500ms with Google Gemini
 - **Polling fallback**: 1-second interval for agent messages
 - **Session monitoring**: 30-second health checks
 
 ## Support
 
-This middleware provides a production-ready solution for real-time AI-powered chat with Odoo Online integration.
+This middleware provides a production-ready solution for real-time AI-powered chat with Odoo Online integration using Google Gemini 2.0 Flash and text-embedding-001.
