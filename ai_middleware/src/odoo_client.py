@@ -150,7 +150,7 @@ class OdooClient:
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
-            # Send message using the working format from initial message
+            # Send message and trigger notification
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -162,7 +162,7 @@ class OdooClient:
                         "body": message,
                         "message_type": "comment",
                         "author_id": False,
-                        "email_from": f"Website Visitor <noreply@visitor.com>"
+                        "email_from": f"{author_name} <visitor@livechat.com>"
                     }
                 },
                 "id": 3
