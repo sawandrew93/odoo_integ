@@ -104,9 +104,9 @@ async def handle_chat(chat_message: ChatMessage):
             )
             
             if odoo_session_id:
-                ai_response = f"I've connected you with a human agent (Session #{odoo_session_id}). The agent will see your request: '{chat_message.message}'. Please wait for their response."
+                ai_response = f"I've connected you with a human agent (Session #{odoo_session_id}). Please wait for their response."
             else:
-                ai_response = "I'm having trouble connecting you to an agent. Please try again."
+                ai_response = "Our support team is currently offline. Please check back soon!"
         
         return ChatResponse(
             response=ai_response,

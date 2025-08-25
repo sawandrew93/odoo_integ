@@ -13,7 +13,7 @@
         widget.id = 'ai-chat-widget';
         widget.innerHTML = `
             <div style="position:fixed;bottom:20px;right:20px;width:300px;height:400px;border:1px solid #ccc;border-radius:10px;background:white;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;flex-direction:column;z-index:9999;font-family:Arial,sans-serif;">
-                <div style="padding:10px;background:#007bff;color:white;border-radius:10px 10px 0 0;font-weight:bold;">Chat Support</div>
+                <div style="padding:10px;background:#007bff;color:white;border-radius:10px 10px 0 0;font-weight:bold;">Ask Vanguard</div>
                 <div id="chat-messages" style="flex:1;padding:10px;overflow-y:auto;border-bottom:1px solid #eee;"></div>
                 <div style="display:flex;padding:10px;">
                     <input type="text" id="message-input" placeholder="Type your message..." style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px;margin-right:8px;">
