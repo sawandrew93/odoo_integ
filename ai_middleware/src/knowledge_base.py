@@ -69,7 +69,11 @@ class KnowledgeBase:
                 with open(os.path.join(directory, filename), 'r', encoding='utf-8') as f:
                     content = f.read().strip()
                     if content:
-                        documents.append(content)
+                        # Split Q&A pairs
+                        qa_pairs = content.split('\n\n')
+                        for qa_pair in qa_pairs:
+                            if qa_pair.strip() and 'Q:' in qa_pair and 'A:' in qa_pair:
+                                documents.append(qa_pair.strip())
         
         if documents:
             self.add_documents(documents)

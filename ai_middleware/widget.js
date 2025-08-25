@@ -119,7 +119,7 @@
         #message-input:focus { border-color: #667eea !important; }
         #send-btn:hover { transform: scale(1.05) !important; }
         #chat-header:hover { background: rgba(255,255,255,0.15) !important; }
-        #chat-header { cursor: pointer !important; }
+        #chat-header { cursor: pointer !important; user-select: none !important; -webkit-user-select: none !important; -moz-user-select: none !important; -ms-user-select: none !important; }
         #chat-messages::-webkit-scrollbar { width: 4px; }
         #chat-messages::-webkit-scrollbar-track { background: #f1f1f1; }
         #chat-messages::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 2px; }
