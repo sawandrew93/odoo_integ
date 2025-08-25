@@ -26,36 +26,21 @@ class AIAgent:
         # Get relevant context from knowledge base
         relevant_docs = self.kb.search(message, top_k=3)
         
-        # Use AI to generate response based on context or general support
-        try:
-            if relevant_docs and relevant_docs[0][1] > 0.3:
-                kb_context = "\n".join([doc for doc, score in relevant_docs[:2] if score > 0.3])
-                prompt = f"You are a helpful customer support agent. Answer the customer's question using the provided context. Be friendly and concise.\n\nContext: {kb_context}\n\nCustomer: {message}\n\nResponse:"
-            else:
-                prompt = f"You are a helpful customer support agent. The customer said: '{message}'. If this is a greeting, respond warmly. If it's a question you cannot answer with confidence, say you'll connect them with a human agent. Be friendly and concise.\n\nResponse:"
-            
-            response = self.model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=150,
-                    temperature=0.4
-                )
-            )
-            
-            ai_answer = response.text.strip()
-            
-            # Check if AI suggests handoff or says it doesn't know
-            handoff_phrases = ['connect you with', 'human agent', 'transfer you', 'speak with someone', "don't have", "don't know", "not sure", "unable to"]
-            if any(phrase in ai_answer.lower() for phrase in handoff_phrases):
-                return True, "I'm sorry I don't have information about that. Would you like me to connect you with our support representative who can better assist you?", 0.0
-            
-            # If no relevant docs and not a greeting, offer handoff
-            if not relevant_docs or relevant_docs[0][1] < 0.3:
-                greeting_words = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening', 'how are you']
-                if not any(word in message.lower() for word in greeting_words):
-                    return True, "I'm sorry, I don't have any information about that. Would you like me to connect you with our support representative?", 0.0
-            
-            return False, ai_answer, 0.8
+        # Handle greetings first
+        greeting_words = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening', 'how are you', 'test', 'testing']
+        if any(word in message.lower() for word in greeting_words):
+            return False, "Hello! How can I help you today?", 0.9
+        
+        # Use knowledge base for known questions
+        if relevant_docs and relevant_docs[0][1] > 0.4:
+            kb_content = relevant_docs[0][0]
+            # Extract answer from Q&A format
+            if 'A:' in kb_content:
+                answer = kb_content.split('A:')[1].strip()
+                return False, answer, relevant_docs[0][1]
+        
+        # For unknown questions, offer handoff
+        return True, "I'm sorry, I don't have information about that. Would you like me to connect you with our support representative?", 0.0
             
         except Exception as e:
             print(f"AI processing error: {e}")
