@@ -18,8 +18,9 @@ class AIAgent:
     def should_handoff(self, message: str, context: str = "") -> Tuple[bool, str, float]:
         """Determine if message should be handed off to human agent"""
         # Check for explicit human agent requests
-        human_keywords = ['agent', 'human', 'talk to someone', 'representative', 'speak to person']
-        if any(keyword in message.lower() for keyword in human_keywords):
+        human_keywords = ['talk to support', 'speak to support', 'human agent', 'live agent', 'representative', 'talk to someone', 'speak to person', 'connect me to agent']
+        message_lower = message.lower()
+        if any(keyword in message_lower for keyword in human_keywords) or ('support' in message_lower and ('talk' in message_lower or 'speak' in message_lower)):
             return True, "I'll connect you with a human agent.", 0.0
         
         # Get relevant context from knowledge base
