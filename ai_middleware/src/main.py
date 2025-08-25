@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
 import os
@@ -173,6 +175,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
         print(f"WebSocket connection failed: {e}")
     finally:
         ws_manager.disconnect(session_id)
+
+@app.get("/widget.js")
+async def get_widget():
+    """Serve the embeddable widget"""
+    widget_path = os.path.join(os.path.dirname(__file__), '..', 'widget.js')
+    return FileResponse(widget_path, media_type='application/javascript')
 
 @app.get("/health")
 async def health_check():
