@@ -14,9 +14,8 @@
         widget.id = 'ai-chat-widget';
         widget.innerHTML = `
             <div id="chat-container" style="position:fixed;bottom:20px;right:20px;width:350px;height:500px;border:none;border-radius:16px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);box-shadow:0 20px 40px rgba(0,0,0,0.1);display:flex;flex-direction:column;z-index:9999;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;transition:all 0.3s ease;overflow:hidden;">
-                <div id="chat-header" style="padding:16px 20px;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);color:white;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <div id="chat-header" style="padding:16px 20px;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);color:white;font-weight:600;cursor:pointer;display:flex;justify-content:center;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);">
                     <span style="font-size:16px;">💬 Ask Vanguard</span>
-                    <span id="minimize-btn" style="cursor:pointer;font-size:20px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,0.2);transition:all 0.2s ease;">−</span>
                 </div>
                 <div id="chat-body" style="flex:1;display:flex;flex-direction:column;background:white;">
                     <div id="chat-messages" style="flex:1;padding:20px;overflow-y:auto;background:linear-gradient(to bottom,#f8f9fa,#ffffff);"></div>
@@ -100,17 +99,14 @@
     function toggleMinimize() {
         const container = document.getElementById('chat-container');
         const chatBody = document.getElementById('chat-body');
-        const minimizeBtn = document.getElementById('minimize-btn');
         
         if (isMinimized) {
             container.style.height = '500px';
             chatBody.style.display = 'flex';
-            minimizeBtn.textContent = '−';
             isMinimized = false;
         } else {
             container.style.height = '60px';
             chatBody.style.display = 'none';
-            minimizeBtn.textContent = '□';
             isMinimized = true;
         }
     }
@@ -120,8 +116,7 @@
     style.textContent = `
         #message-input:focus { border-color: #667eea !important; }
         #send-btn:hover { transform: scale(1.05) !important; }
-        #minimize-btn:hover { background: rgba(255,255,255,0.3) !important; }
-        #minimize-btn { cursor: default !important; }
+        #chat-header:hover { background: rgba(255,255,255,0.15) !important; }
         #chat-messages::-webkit-scrollbar { width: 4px; }
         #chat-messages::-webkit-scrollbar-track { background: #f1f1f1; }
         #chat-messages::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 2px; }
@@ -136,5 +131,5 @@
     document.getElementById('message-input').onkeypress = (e) => {
         if (e.key === 'Enter') sendMessage();
     };
-    document.getElementById('minimize-btn').onclick = toggleMinimize;
+    document.getElementById('chat-header').onclick = toggleMinimize;
 })();
