@@ -106,13 +106,11 @@
             container.style.height = '500px';
             chatBody.style.display = 'flex';
             minimizeBtn.textContent = '−';
-            minimizeBtn.style.transform = 'rotate(0deg)';
             isMinimized = false;
         } else {
             container.style.height = '60px';
             chatBody.style.display = 'none';
-            minimizeBtn.textContent = '+';
-            minimizeBtn.style.transform = 'rotate(45deg)';
+            minimizeBtn.textContent = '□';
             isMinimized = true;
         }
     }
@@ -123,6 +121,7 @@
         #message-input:focus { border-color: #667eea !important; }
         #send-btn:hover { transform: scale(1.05) !important; }
         #minimize-btn:hover { background: rgba(255,255,255,0.3) !important; }
+        #minimize-btn { cursor: default !important; }
         #chat-messages::-webkit-scrollbar { width: 4px; }
         #chat-messages::-webkit-scrollbar-track { background: #f1f1f1; }
         #chat-messages::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 2px; }
