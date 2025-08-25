@@ -50,51 +50,66 @@ class OdooClient:
             if not self.authenticate():
                 return None
         
-        # Try channel ID 1 first, then 2
-        for channel_id in [1, 2]:
-            print(f"Attempting to create session for channel {channel_id} with visitor {visitor_name}")
+        # First, get available live chat channels
+        try:
+            channels_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "im_livechat.channel",
+                    "method": "search_read",
+                    "args": [[], ["id", "name", "user_ids"]],
+                    "kwargs": {}
+                },
+                "id": 1
+            }
             
-            try:
-                rpc_data = {
-                    "jsonrpc": "2.0",
-                    "method": "call",
-                    "params": {
-                        "channel_id": channel_id,
-                        "anonymous_name": visitor_name,
-                        "previous_operator_id": False,
-                        "country_id": False,
-                        "user_id": False,
-                        "persisted": True
-                    },
-                    "id": 2
-                }
-                
-                response = self.session.post(f"{self.url}/im_livechat/get_session", json=rpc_data)
-                
-                if response.status_code == 200:
-                    try:
-                        result = response.json()
-                        print(f"Live chat response: {result}")
-                        
-                        if result.get('result') and result['result'] != False:
-                            session_data = result['result']
-                            session_id = session_data.get('channel_id')
-                            if session_id:
-                                print(f"✅ Live chat session created! ID: {session_id}")
-                                # Send the initial message as visitor
-                                self.send_message_to_session(session_id, message, visitor_name)
-                                return session_id
-                    except json.JSONDecodeError:
-                        print(f"Non-JSON response for channel {channel_id}: {response.text[:200]}")
-                        continue
-                else:
-                    print(f"HTTP {response.status_code} for channel {channel_id}")
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=channels_data)
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    channels = result['result']
+                    print(f"Available live chat channels: {channels}")
                     
-            except Exception as e:
-                print(f"Error with channel {channel_id}: {e}")
-                continue
+                    # Try each available channel
+                    for channel in channels:
+                        channel_id = channel['id']
+                        if not channel.get('user_ids'):  # Skip channels with no operators
+                            continue
+                            
+                        print(f"Attempting to create session for channel {channel_id} ({channel['name']})")
+                        
+                        # Try the updated endpoint
+                        rpc_data = {
+                            "jsonrpc": "2.0",
+                            "method": "call",
+                            "params": {
+                                "channel_id": channel_id,
+                                "anonymous_name": visitor_name
+                            },
+                            "id": 2
+                        }
+                        
+                        session_response = self.session.post(f"{self.url}/im_livechat/get_session", json=rpc_data)
+                        
+                        if session_response.status_code == 200:
+                            session_result = session_response.json()
+                            print(f"Live chat response: {session_result}")
+                            
+                            if session_result.get('result') and session_result['result'] != False:
+                                session_data = session_result['result']
+                                session_id = session_data.get('channel_id')
+                                if session_id:
+                                    print(f"✅ Live chat session created! ID: {session_id}")
+                                    # Send the initial message
+                                    self.send_message_to_session(session_id, message, visitor_name)
+                                    return session_id
+                else:
+                    print("No live chat channels found")
+        except Exception as e:
+            print(f"Error getting channels: {e}")
         
-        print("❌ All channels failed")
+        print("❌ Failed to create live chat session")
         return None
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
