@@ -71,7 +71,7 @@
                 body: JSON.stringify({
                     message: message,
                     visitor_name: 'Website Visitor',
-                    session_id: sessionId
+                    session_id: sessionId ? sessionId.toString() : null
                 })
             });
 
