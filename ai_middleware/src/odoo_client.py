@@ -119,23 +119,37 @@ class OdooClient:
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
-            # Send message and trigger notification
+            # Send message as visitor using the livechat endpoint
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "model": "discuss.channel",
-                    "method": "message_post",
-                    "args": [session_id],
-                    "kwargs": {
-                        "body": message,
-                        "message_type": "comment",
-                        "author_id": False,
-                        "email_from": f"{author_name} <visitor@livechat.com>"
-                    }
+                    "channel_id": session_id,
+                    "message": message
                 },
                 "id": 3
             }
+            
+            response = self.session.post(f"{self.url}/im_livechat/send_message", json=message_data)
+            
+            # If that fails, try the direct message_post method
+            if response.status_code != 200 or not response.json().get('result'):
+                message_data = {
+                    "jsonrpc": "2.0",
+                    "method": "call",
+                    "params": {
+                        "model": "discuss.channel",
+                        "method": "message_post",
+                        "args": [session_id],
+                        "kwargs": {
+                            "body": message,
+                            "message_type": "comment",
+                            "author_id": False,
+                            "email_from": f"{author_name} <{author_name.lower().replace(' ', '')}@visitor.com>"
+                        }
+                    },
+                    "id": 3
+                }
             
             response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
             
