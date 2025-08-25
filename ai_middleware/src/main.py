@@ -50,6 +50,9 @@ class ChatMessage(BaseModel):
     visitor_name: Optional[str] = "Anonymous"
     session_id: Optional[str] = None
     context: Optional[str] = ""
+    
+    class Config:
+        extra = "ignore"  # Ignore extra fields
 
 class ChatResponse(BaseModel):
     response: str
@@ -61,6 +64,8 @@ class ChatResponse(BaseModel):
 async def handle_chat(chat_message: ChatMessage):
     """Main endpoint for handling chat messages"""
     try:
+        print(f"Received chat message: {chat_message}")
+        
         # If session_id exists, send message directly to Odoo
         if chat_message.session_id:
             success = odoo_client.send_message_to_session(
