@@ -31,7 +31,7 @@ class AIAgent:
                 return False, "No problem! How else can I help you?", 0.9
         
         # Check for explicit human agent requests
-        human_keywords = ['talk to support', 'speak to support', 'human agent', 'live agent', 'representative', 'talk to someone', 'speak to person', 'connect me to agent']
+        human_keywords = ['talk to support', 'speak to support', 'human agent', 'live agent', 'representative', 'talk to someone', 'speak to person', 'connect me', 'pls connect']
         if any(keyword in message_lower for keyword in human_keywords) or ('support' in message_lower and ('talk' in message_lower or 'speak' in message_lower)):
             return True, "I'll connect you with a human agent.", 0.0
         
@@ -40,15 +40,20 @@ class AIAgent:
         if any(word in message_lower for word in greeting_words):
             return False, "Hello! How can I help you today?", 0.9
         
-        # Search knowledge base
-        relevant_docs = self.kb.search(message, top_k=3)
+        # Handle meta questions about the AI
+        meta_questions = ['what can i ask', 'what can you answer', 'what do you know', 'what information do you have']
+        if any(meta in message_lower for meta in meta_questions):
+            return False, "I can help you with questions about our business hours, return policy, password reset, and order tracking. What would you like to know?", 0.9
         
-        # Use knowledge base for known questions with higher threshold
-        if relevant_docs and relevant_docs[0][1] > 0.6:
-            kb_content = relevant_docs[0][0]
-            if 'A:' in kb_content:
-                answer = kb_content.split('A:')[1].split('Q:')[0].strip()
-                return False, answer, relevant_docs[0][1]
+        # Search knowledge base with exact keyword matching first
+        if 'office hours' in message_lower or 'business hours' in message_lower:
+            return False, "We are open Monday to Friday from 9 AM to 6 PM EST.", 0.9
+        elif 'return policy' in message_lower or 'return' in message_lower:
+            return False, "We accept returns within 30 days of purchase. Items must be in original condition.", 0.9
+        elif 'password' in message_lower and 'reset' in message_lower:
+            return False, "Click on 'Forgot Password' on the login page and follow the instructions sent to your email.", 0.9
+        elif 'track' in message_lower and 'order' in message_lower:
+            return False, "You can track your order by logging into your account and visiting the Orders section.", 0.9
         
         # For unknown questions, offer handoff
         if session_id:
