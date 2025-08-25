@@ -13,13 +13,13 @@
         const widget = document.createElement('div');
         widget.id = 'ai-chat-widget';
         widget.innerHTML = `
-            <div id="chat-container" style="position:fixed;bottom:20px;right:20px;width:350px;height:500px;border:none;border-radius:16px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);box-shadow:0 20px 40px rgba(0,0,0,0.1);display:flex;flex-direction:column;z-index:9999;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;transition:all 0.3s ease;overflow:hidden;">
-                <div id="chat-header" style="padding:16px 20px;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);color:white;font-weight:600;cursor:pointer;display:flex;justify-content:center;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);">
+            <div id="chat-container" style="position:fixed;bottom:20px;right:20px;width:350px;max-height:500px;height:500px;border:none;border-radius:16px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);box-shadow:0 20px 40px rgba(0,0,0,0.1);display:flex;flex-direction:column;z-index:9999;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;transition:all 0.3s ease;overflow:hidden;">
+                <div id="chat-header" style="padding:16px 20px;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);color:white;font-weight:600;cursor:pointer;display:flex;justify-content:center;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);flex-shrink:0;">
                     <span style="font-size:16px;">💬 Ask Vanguard</span>
                 </div>
-                <div id="chat-body" style="flex:1;display:flex;flex-direction:column;background:white;">
-                    <div id="chat-messages" style="flex:1;padding:20px;overflow-y:auto;background:linear-gradient(to bottom,#f8f9fa,#ffffff);"></div>
-                    <div style="padding:16px 20px;background:white;border-top:1px solid #e9ecef;">
+                <div id="chat-body" style="flex:1;display:flex;flex-direction:column;background:white;min-height:0;">
+                    <div id="chat-messages" style="flex:1;padding:20px;overflow-y:auto;background:linear-gradient(to bottom,#f8f9fa,#ffffff);min-height:0;"></div>
+                    <div style="padding:16px 20px;background:white;border-top:1px solid #e9ecef;flex-shrink:0;">
                         <div style="display:flex;gap:8px;">
                             <input type="text" id="message-input" placeholder="Type your message..." style="flex:1;padding:12px 16px;border:2px solid #e9ecef;border-radius:25px;outline:none;font-size:14px;transition:border-color 0.2s ease;">
                             <button id="send-btn" style="padding:12px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:25px;cursor:pointer;font-weight:600;transition:transform 0.2s ease;min-width:60px;">Send</button>
@@ -54,6 +54,8 @@
             const data = JSON.parse(event.data);
             if (data.type === 'message') {
                 addMessage(`${data.data.author}: ${data.data.body}`);
+            } else if (data.type === 'agent_joined') {
+                addMessage(`${data.data.agent_name} joined the chat`, false, true);
             } else if (data.type === 'session_ended') {
                 addMessage(data.message, false, true);
                 sessionEnded = true;
