@@ -48,6 +48,20 @@ class AIAgent:
             self.conversation_history[session_key].append(f"AI: {response}")
             return True, response, 0.0
         
+        # Handle common patterns first
+        if any(word in message_lower for word in ['hi', 'hello', 'hey']):
+            response = "Hello! How can I help you today?"
+            self.conversation_history[session_key].append(f"AI: {response}")
+            return False, response, 0.9
+        elif 'how are you' in message_lower:
+            response = "I'm doing well, thank you! How can I assist you today?"
+            self.conversation_history[session_key].append(f"AI: {response}")
+            return False, response, 0.9
+        elif any(meta in message_lower for meta in ['what can i ask', 'what can you help', 'what do you know']):
+            response = "I can help you with questions about our business hours, return policy, password reset, and order tracking. What would you like to know?"
+            self.conversation_history[session_key].append(f"AI: {response}")
+            return False, response, 0.9
+        
         # Use AI to generate response based on knowledge base
         try:
             # Get relevant knowledge from knowledge base
@@ -56,32 +70,30 @@ class AIAgent:
             # Create context from knowledge base
             context = "\n".join([doc['content'] for doc in relevant_docs]) if relevant_docs else ""
             
-            # Create AI prompt
+            # Create AI prompt with better instructions
             prompt = f"""
-You are a helpful customer support assistant. Answer the user's question based on the provided knowledge base.
+You are a helpful customer support assistant. Answer the user's question based ONLY on the provided knowledge base.
 
 Knowledge Base:
 {context}
 
 User Question: {message}
 
-Rules:
-1. Only answer based on the knowledge base provided
-2. If you don't have the information, say "I don't have information about that. I can connect you with our support representative if you want."
-3. Be concise and helpful
-4. For greetings, respond warmly
-5. If asked what you can help with, mention the topics you have knowledge about
+Instructions:
+- If the knowledge base contains relevant information, provide a helpful answer
+- If the knowledge base doesn't contain the information needed, respond with: "I don't have information about that. I can connect you with our support representative if you want."
+- Be concise and friendly
+- Don't make up information not in the knowledge base
 
-Response:"""
+Answer:"""
             
             # Generate response using Gemini
             ai_response = self.model.generate_content(prompt)
             response = ai_response.text.strip()
             
             # Check if AI says it doesn't have information
-            if "don't have information" in response.lower() or "i don't know" in response.lower():
+            if "don't have information" in response.lower():
                 self.pending_handoff[session_key] = True
-                response = "I don't have information about that. I can connect you with our support representative if you want."
                 self.conversation_history[session_key].append(f"AI: {response}")
                 return False, response, 0.3
             else:
