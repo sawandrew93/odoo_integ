@@ -17,7 +17,7 @@
                 <div id="chat-header" style="padding:0;background:transparent;color:white;font-weight:600;cursor:pointer;display:flex;justify-content:center;align-items:center;flex-shrink:0;width:100%;height:100%;">
                     <span style="font-size:24px;">💬</span>
                 </div>
-                <div id="chat-body" style="flex:1;display:none;flex-direction:column;background:white;min-height:0;">
+                <div id="chat-body" style="flex:1;display:none;flex-direction:column;background:white;min-height:0;position:absolute;top:60px;left:0;right:0;bottom:0;border-radius:0 0 16px 16px;">
                     <div id="chat-messages" style="flex:1;padding:20px;overflow-y:auto;background:linear-gradient(to bottom,#f8f9fa,#ffffff);min-height:0;"></div>
                     <div style="padding:16px 20px;background:white;border-top:1px solid #e9ecef;flex-shrink:0;">
                         <div style="display:flex;gap:8px;">
@@ -106,23 +106,27 @@
             container.style.width = '350px';
             container.style.height = '500px';
             container.style.borderRadius = '16px';
+            container.style.position = 'relative';
             chatBody.style.display = 'flex';
             document.querySelector('#chat-header span').textContent = '💬 Chat Support';
             document.querySelector('#chat-header span').style.fontSize = '16px';
             document.querySelector('#chat-header').style.padding = '16px 20px';
             document.querySelector('#chat-header').style.background = 'rgba(255,255,255,0.1)';
             document.querySelector('#chat-header').style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+            document.querySelector('#chat-header').style.height = '60px';
             isMinimized = false;
         } else {
             container.style.width = '60px';
             container.style.height = '60px';
             container.style.borderRadius = '50%';
+            container.style.position = 'static';
             chatBody.style.display = 'none';
             document.querySelector('#chat-header span').textContent = '💬';
             document.querySelector('#chat-header span').style.fontSize = '24px';
             document.querySelector('#chat-header').style.padding = '0';
             document.querySelector('#chat-header').style.background = 'transparent';
             document.querySelector('#chat-header').style.borderBottom = 'none';
+            document.querySelector('#chat-header').style.height = '100%';
             isMinimized = true;
         }
     }
