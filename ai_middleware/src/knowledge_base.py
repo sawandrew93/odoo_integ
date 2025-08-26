@@ -12,27 +12,54 @@ class KnowledgeBase:
         self.embeddings = []
         genai.configure(api_key=api_key)
         
-        # Initialize Supabase if credentials provided
+        # Initialize Supabase - required for operation
         self.supabase = None
-        if supabase_url and supabase_key:
-            try:
-                self.supabase: Client = create_client(supabase_url, supabase_key)
-                self._ensure_table_exists()
-            except Exception as e:
-                print(f"Supabase connection failed: {e}")
+        if not supabase_url or not supabase_key:
+            raise ValueError("Supabase credentials required. Please set SUPABASE_URL and SUPABASE_KEY in .env")
+        
+        try:
+            self.supabase: Client = create_client(supabase_url, supabase_key)
+            self._ensure_table_exists()
+            print(f"✅ Supabase connected successfully")
+        except Exception as e:
+            raise ConnectionError(f"Failed to connect to Supabase: {e}")
         
     def add_documents(self, documents: List[str]):
-        """Add documents to knowledge base with embeddings"""
-        self.documents.extend(documents)
+        """Add documents to knowledge base with embeddings via Supabase"""
+        if not self.supabase:
+            raise ConnectionError("Supabase not connected. Cannot add documents.")
+            
         for doc in documents:
-            embedding = genai.embed_content(
-                model="models/embedding-001",
-                content=doc
-            )["embedding"]
-            self.embeddings.append(embedding)
+            content_hash = self._get_content_hash(doc)
+            
+            # Check if already exists
+            result = self.supabase.table('knowledge_embeddings').select('*').eq('content_hash', content_hash).execute()
+            
+            if not result.data:
+                # Create new embedding
+                embedding = genai.embed_content(
+                    model="models/embedding-001",
+                    content=doc
+                )["embedding"]
+                
+                # Store in Supabase
+                self.supabase.table('knowledge_embeddings').insert({
+                    'content': doc,
+                    'embedding': json.dumps(embedding),
+                    'content_hash': content_hash
+                }).execute()
+                
+                # Add to local cache
+                self.documents.append(doc)
+                self.embeddings.append(embedding)
+                print(f"Added new document: {doc[:50]}...")
     
     def search(self, query: str, top_k: int = 3) -> List[dict]:
         """Semantic search using embeddings"""
+        if not self.supabase:
+            print(f"❌ Supabase not connected. Cannot search knowledge base.")
+            return []
+            
         if not self.documents:
             print(f"No documents loaded in knowledge base")
             return []
@@ -56,25 +83,9 @@ class KnowledgeBase:
             
         except Exception as e:
             print(f"Embedding search error: {e}")
-            # Fallback to keyword search
-            return self._keyword_search(query, top_k)
+            return []
     
-    def _keyword_search(self, query: str, top_k: int = 3) -> List[dict]:
-        """Fallback keyword search"""
-        query_lower = query.lower()
-        results = []
-        
-        for doc in self.documents:
-            doc_lower = doc.lower()
-            query_words = [w for w in query_lower.split() if len(w) > 2]
-            if query_words:
-                score = sum(1 for word in query_words if word in doc_lower)
-                if score > 0:
-                    results.append({'content': doc, 'score': score / len(query_words)})
-        
-        results.sort(key=lambda x: x['score'], reverse=True)
-        print(f"Keyword search found {len(results)} results for: {query}")
-        return results[:top_k]
+
     
     def _ensure_table_exists(self):
         """Create embeddings table if it doesn't exist"""
@@ -91,6 +102,10 @@ class KnowledgeBase:
     
     def load_from_directory(self, directory: str):
         """Load text files from directory with Supabase caching"""
+        if not self.supabase:
+            print(f"❌ Supabase not connected. Cannot load knowledge base.")
+            return
+            
         documents = []
         for filename in os.listdir(directory):
             if filename.endswith('.txt'):
@@ -104,13 +119,7 @@ class KnowledgeBase:
                                 documents.append(section.strip())
         
         print(f"Found {len(documents)} documents from {directory}")
-        
-        if self.supabase:
-            self._load_from_supabase(documents)
-        else:
-            # Fallback to in-memory embedding
-            if documents:
-                self.add_documents(documents)
+        self._load_from_supabase(documents)
     
     def _load_from_supabase(self, documents: List[str]):
         """Load embeddings from Supabase or create new ones"""
@@ -146,11 +155,5 @@ class KnowledgeBase:
                     print(f"Created new embedding for: {doc[:50]}...")
                     
             except Exception as e:
-                print(f"Supabase error for doc, falling back to memory: {e}")
-                # Fallback to in-memory
-                embedding = genai.embed_content(
-                    model="models/embedding-001",
-                    content=doc
-                )["embedding"]
-                self.documents.append(doc)
-                self.embeddings.append(embedding)
+                print(f"Supabase error for document: {e}")
+                raise
