@@ -1,11 +1,13 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import os
 import json
 from dotenv import load_dotenv
+import PyPDF2
+import io
 
 from .odoo_client import OdooClient
 from .ai_agent import AIAgent
@@ -209,6 +211,70 @@ async def get_connections():
         "active_sessions": list(ws_manager.connections.keys()),
         "monitoring_tasks": len(ws_manager.tasks)
     }
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_panel():
+    """Knowledge base admin panel"""
+    template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'knowledge_upload.html')
+    with open(template_path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+@app.post("/admin/upload-knowledge")
+async def upload_knowledge(files: List[UploadFile] = File(...)):
+    """Upload and process knowledge files"""
+    processed = 0
+    
+    for file in files:
+        try:
+            content = ""
+            
+            if file.filename.endswith('.pdf'):
+                # Extract text from PDF
+                pdf_content = await file.read()
+                pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
+                
+                for page in pdf_reader.pages:
+                    content += page.extract_text() + "\n"
+                    
+            elif file.filename.endswith('.txt'):
+                # Read text file
+                content = (await file.read()).decode('utf-8')
+            
+            if content.strip():
+                # Split into chunks and add to knowledge base
+                chunks = [chunk.strip() for chunk in content.split('\n\n') if chunk.strip()]
+                ai_agent.kb.add_documents(chunks)
+                processed += 1
+                
+        except Exception as e:
+            print(f"Error processing {file.filename}: {e}")
+            continue
+    
+    return {"processed": processed, "message": f"Successfully processed {processed} files"}
+
+@app.get("/admin/knowledge-list")
+async def list_knowledge():
+    """List all knowledge base documents"""
+    if not ai_agent.kb.supabase:
+        return []
+    
+    try:
+        result = ai_agent.kb.supabase.table('knowledge_embeddings').select('id, content').execute()
+        return result.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/admin/knowledge/{doc_id}")
+async def delete_knowledge(doc_id: int):
+    """Delete a knowledge document"""
+    if not ai_agent.kb.supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    
+    try:
+        ai_agent.kb.supabase.table('knowledge_embeddings').delete().eq('id', doc_id).execute()
+        return {"message": "Document deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
