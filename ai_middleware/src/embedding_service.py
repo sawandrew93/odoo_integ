@@ -8,9 +8,8 @@ class EmbeddingService:
         genai.configure(api_key=api_key)
         self.embedding_model = genai.GenerativeModel('embedding-001')
         
-        # Free-tier limits
-        self.MAX_TOKENS_PER_MIN = 5_000_000
-        self.batch_size = 5
+        # Conservative free-tier limits
+        self.batch_size = 3  # Smaller batches
         
         # Track token usage
         self.tokens_used = []
@@ -42,36 +41,40 @@ class EmbeddingService:
         return sum(entry["tokens"] for entry in self.tokens_used)
     
     async def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding with rate limiting"""
+        """Generate embedding with aggressive rate limiting"""
         if not text or not text.strip():
             raise ValueError("Text cannot be empty")
         
         # Clean and prepare
         clean_text = text.strip()
-        token_count = self.count_tokens(clean_text)
         
-        # Rate limiting: wait if this would exceed quota
-        while self.get_tokens_last_minute() + token_count > self.MAX_TOKENS_PER_MIN:
-            print("⏳ Waiting for token budget to reset...")
-            time.sleep(1)
+        # Aggressive rate limiting for free tier
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                result = genai.embed_content(
+                    model="models/embedding-001",
+                    content=clean_text,
+                    task_type="retrieval_document"
+                )
+                embedding = result["embedding"]
+                
+                if not embedding or len(embedding) == 0:
+                    raise ValueError("Failed to generate embedding")
+                
+                return embedding
+                
+            except Exception as error:
+                if "429" in str(error) or "quota" in str(error).lower():
+                    wait_time = (attempt + 1) * 60  # 60, 120, 180, 240, 300 seconds
+                    print(f"⏳ Rate limited. Waiting {wait_time} seconds (attempt {attempt + 1}/{max_retries})...")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    print(f"❌ Error generating embedding: {error}")
+                    raise error
         
-        try:
-            result = genai.embed_content(
-                model="models/embedding-001",
-                content=clean_text,
-                task_type="retrieval_document"
-            )
-            embedding = result["embedding"]
-            
-            if not embedding or len(embedding) == 0:
-                raise ValueError("Failed to generate embedding")
-            
-            self.record_tokens(token_count)
-            return embedding
-            
-        except Exception as error:
-            print(f"❌ Error generating embedding: {error}")
-            raise error
+        raise Exception("Max retries exceeded for rate limiting")
     
     async def generate_batch_embeddings(self, documents: List[Dict[str, str]], progress_callback=None) -> Dict[str, Any]:
         """Generate embeddings for batch of documents with progress tracking"""
@@ -123,11 +126,11 @@ class EmbeddingService:
                     if progress_callback:
                         progress_callback(f"❌ Chunk {doc_index} failed: {str(error)}")
             
-            # Delay between batches
+            # Longer delay between batches for free tier
             if i + self.batch_size < len(documents):
                 if progress_callback:
-                    progress_callback("⏳ Waiting 10 seconds before next batch...")
-                time.sleep(10)
+                    progress_callback("⏳ Waiting 60 seconds before next batch...")
+                time.sleep(60)
         
         return {
             "results": results,

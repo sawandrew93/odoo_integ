@@ -66,14 +66,15 @@
 
             const uploadBtn = document.getElementById('uploadBtn');
             uploadBtn.disabled = true;
-            uploadBtn.textContent = '⏳ Processing...';
+            uploadBtn.textContent = '⏳ Processing (may take several minutes)...';
             
             const progressDiv = document.createElement('div');
             progressDiv.id = 'progressDiv';
             progressDiv.style.cssText = 'background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; font-family: monospace; max-height: 200px; overflow-y: auto;';
+            progressDiv.innerHTML = '<div>📤 Starting file processing and embedding...</div><div>⚠️ This may take several minutes due to rate limiting</div>';
             document.getElementById('status').appendChild(progressDiv);
             
-            showStatus('📤 Starting file processing and embedding...');
+            showStatus('📤 Processing files - please wait...');
 
             const formData = new FormData();
             for (let file of files) {
@@ -84,11 +85,18 @@
                 const headers = getAuthHeaders();
                 if (!headers) return;
 
+                // Increase timeout to 10 minutes
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes
+
                 const response = await fetch('/admin/upload-knowledge', {
                     method: 'POST',
                     headers: headers,
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
                 
                 if (response.status === 401) {
                     localStorage.removeItem('admin_token');
@@ -112,14 +120,18 @@
                     showStatus(`❌ Error: ${result.detail}`, true);
                 }
             } catch (error) {
-                showStatus(`❌ Upload failed: ${error.message}`, true);
+                if (error.name === 'AbortError') {
+                    showStatus('❌ Upload timed out after 10 minutes. Check server logs for progress.', true);
+                } else {
+                    showStatus(`❌ Upload failed: ${error.message}`, true);
+                }
             } finally {
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = '📤 Upload Files';
                 setTimeout(() => {
                     const prog = document.getElementById('progressDiv');
                     if (prog) prog.remove();
-                }, 10000);
+                }, 30000); // Keep progress visible longer
             }
         }
         
