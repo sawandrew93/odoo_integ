@@ -297,9 +297,13 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
             
             if content.strip():
                 # Split into chunks and add to knowledge base
-                chunks = [chunk.strip() for chunk in content.split('\n\n') if chunk.strip()]
-                ai_agent.kb.add_documents(chunks)
-                processed += 1
+                chunks = [chunk.strip() for chunk in content.split('\n\n') if chunk.strip() and len(chunk.strip()) > 50]
+                print(f"📄 Processing {file.filename}: {len(chunks)} chunks")
+                if chunks:
+                    ai_agent.kb.add_documents(chunks)
+                    processed += 1
+                else:
+                    print(f"⚠️ No valid chunks found in {file.filename}")
                 
         except Exception as e:
             print(f"Error processing {file.filename}: {e}")

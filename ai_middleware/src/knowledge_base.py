@@ -43,16 +43,16 @@ class KnowledgeBase:
                 )["embedding"]
                 
                 # Store in Supabase
-                self.supabase.table('knowledge_embeddings').insert({
+                insert_result = self.supabase.table('knowledge_embeddings').insert({
                     'content': doc,
-                    'embedding': json.dumps(embedding),
+                    'embedding': embedding,  # Store as array, not JSON string
                     'content_hash': content_hash
                 }).execute()
                 
                 # Add to local cache
                 self.documents.append(doc)
                 self.embeddings.append(embedding)
-                print(f"Added new document: {doc[:50]}...")
+                print(f"✅ Added new document: {doc[:50]}...")
     
     def search(self, query: str, top_k: int = 3) -> List[dict]:
         """Semantic search using embeddings"""
@@ -134,8 +134,12 @@ class KnowledgeBase:
                     # Use existing embedding
                     row = result.data[0]
                     self.documents.append(row['content'])
-                    self.embeddings.append(json.loads(row['embedding']))
-                    print(f"Loaded cached embedding for: {doc[:50]}...")
+                    # Handle both array and JSON string formats
+                    embedding = row['embedding']
+                    if isinstance(embedding, str):
+                        embedding = json.loads(embedding)
+                    self.embeddings.append(embedding)
+                    print(f"✅ Loaded cached embedding for: {doc[:50]}...")
                 else:
                     # Create new embedding
                     embedding = genai.embed_content(
@@ -146,13 +150,13 @@ class KnowledgeBase:
                     # Store in Supabase
                     self.supabase.table('knowledge_embeddings').insert({
                         'content': doc,
-                        'embedding': json.dumps(embedding),
+                        'embedding': embedding,  # Store as array
                         'content_hash': content_hash
                     }).execute()
                     
                     self.documents.append(doc)
                     self.embeddings.append(embedding)
-                    print(f"Created new embedding for: {doc[:50]}...")
+                    print(f"✅ Created new embedding for: {doc[:50]}...")
                     
             except Exception as e:
                 print(f"Supabase error for document: {e}")
