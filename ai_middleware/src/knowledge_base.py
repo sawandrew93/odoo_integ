@@ -43,8 +43,8 @@ class KnowledgeBase:
             if not result.data:
                 try:
                     # Add rate limiting delay
-                    print(f"⏳ Waiting 1 second before processing document {i+1}...", flush=True)
-                    time.sleep(1)  # 1 second delay between requests
+                    print(f"⏳ Waiting 5 seconds before processing document {i+1}...", flush=True)
+                    time.sleep(5)  # 5 second delay = 12 requests/minute (under 15 limit)
                     
                     print(f"🔄 Creating embedding for document {i+1}...", flush=True)
                     # Create new embedding using Gemini's recommended approach
