@@ -72,18 +72,20 @@ class AIAgent:
             
             # Create AI prompt with better instructions
             prompt = f"""
-You are a helpful customer support assistant. Answer the user's question based ONLY on the provided knowledge base.
+You are a helpful customer support assistant. Answer the user's question based on the provided knowledge base content.
 
-Knowledge Base:
+Knowledge Base Content:
 {context}
 
 User Question: {message}
 
 Instructions:
-- If the knowledge base contains relevant information, provide a helpful answer
-- If the knowledge base doesn't contain the information needed, respond with: "I don't have information about that. I can connect you with our support representative if you want."
-- Be concise and friendly
-- Don't make up information not in the knowledge base
+- Extract and provide the specific information from the knowledge base that answers the user's question
+- Give a complete, helpful answer using the actual content from the knowledge base
+- If the knowledge base contains relevant information, provide the details, not just a reference
+- If no relevant information is found, respond with: "I don't have information about that. I can connect you with our support representative if you want."
+- Be specific and informative
+- Use the actual text content, not just page references
 
 Answer:"""
             

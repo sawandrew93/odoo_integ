@@ -286,8 +286,10 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
                 pdf_content = await file.read()
                 pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
                 
-                for page in pdf_reader.pages:
-                    content += page.extract_text() + "\n"
+                for page_num, page in enumerate(pdf_reader.pages):
+                    page_text = page.extract_text()
+                    if page_text.strip():  # Only add non-empty pages
+                        content += f"Page {page_num + 1}:\n{page_text}\n\n"
                     
             elif file.filename.endswith('.txt'):
                 # Read text file
