@@ -74,6 +74,8 @@ class AIAgent:
             response = "We accept returns within 30 days of purchase. Items must be in original condition."
         elif 'password' in message_lower and 'reset' in message_lower:
             response = "Click on 'Forgot Password' on the login page and follow the instructions sent to your email."
+        elif 'login page' in message_lower or ('login' in message_lower and ('page' in message_lower or 'find' in message_lower or 'where' in message_lower)):
+            response = "You can find the login page by clicking the 'Sign In' or 'Login' button at the top right of our website homepage."
         elif 'track' in message_lower and 'order' in message_lower:
             response = "You can track your order by logging into your account and visiting the Orders section."
         elif 'order tracking' in message_lower:
