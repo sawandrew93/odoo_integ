@@ -13,9 +13,9 @@
         const widget = document.createElement('div');
         widget.id = 'ai-chat-widget';
         widget.innerHTML = `
-            <div id="chat-container" style="position:fixed;bottom:20px;right:20px;width:350px;height:60px;border:none;border-radius:16px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);box-shadow:0 20px 40px rgba(0,0,0,0.1);display:flex;flex-direction:column;z-index:9999;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;transition:all 0.3s ease;overflow:hidden;">
-                <div id="chat-header" style="padding:16px 20px;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);color:white;font-weight:600;cursor:pointer;display:flex;justify-content:center;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);flex-shrink:0;">
-                    <span style="font-size:16px;">💬 Chat Support</span>
+            <div id="chat-container" style="position:fixed;bottom:20px;right:20px;width:60px;height:60px;border:none;border-radius:50%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;flex-direction:column;z-index:9999;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;transition:all 0.3s ease;overflow:hidden;">
+                <div id="chat-header" style="padding:0;background:transparent;color:white;font-weight:600;cursor:pointer;display:flex;justify-content:center;align-items:center;flex-shrink:0;width:100%;height:100%;">
+                    <span style="font-size:24px;">💬</span>
                 </div>
                 <div id="chat-body" style="flex:1;display:none;flex-direction:column;background:white;min-height:0;">
                     <div id="chat-messages" style="flex:1;padding:20px;overflow-y:auto;background:linear-gradient(to bottom,#f8f9fa,#ffffff);min-height:0;"></div>
@@ -103,12 +103,26 @@
         const chatBody = document.getElementById('chat-body');
         
         if (isMinimized) {
+            container.style.width = '350px';
             container.style.height = '500px';
+            container.style.borderRadius = '16px';
             chatBody.style.display = 'flex';
+            document.querySelector('#chat-header span').textContent = '💬 Chat Support';
+            document.querySelector('#chat-header span').style.fontSize = '16px';
+            document.querySelector('#chat-header').style.padding = '16px 20px';
+            document.querySelector('#chat-header').style.background = 'rgba(255,255,255,0.1)';
+            document.querySelector('#chat-header').style.borderBottom = '1px solid rgba(255,255,255,0.1)';
             isMinimized = false;
         } else {
+            container.style.width = '60px';
             container.style.height = '60px';
+            container.style.borderRadius = '50%';
             chatBody.style.display = 'none';
+            document.querySelector('#chat-header span').textContent = '💬';
+            document.querySelector('#chat-header span').style.fontSize = '24px';
+            document.querySelector('#chat-header').style.padding = '0';
+            document.querySelector('#chat-header').style.background = 'transparent';
+            document.querySelector('#chat-header').style.borderBottom = 'none';
             isMinimized = true;
         }
     }
