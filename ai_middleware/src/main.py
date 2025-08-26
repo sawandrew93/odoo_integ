@@ -376,10 +376,13 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
 async def list_knowledge(token: str = Depends(verify_admin_token)):
     """List all knowledge base documents grouped by filename (protected)"""
     if not ai_agent or not ai_agent.kb or not ai_agent.kb.supabase:
+        print(f"Knowledge base check failed: ai_agent={ai_agent is not None}, kb={ai_agent.kb if ai_agent else None}, supabase={ai_agent.kb.supabase if ai_agent and ai_agent.kb else None}")
         raise HTTPException(status_code=500, detail="Knowledge base not properly configured. Please check Supabase credentials.")
     
     try:
+        print("Fetching knowledge embeddings from Supabase...")
         result = ai_agent.kb.supabase.table('knowledge_embeddings').select('filename').execute()
+        print(f"Supabase result: {result}")
         
         # Group by filename and count chunks
         files = {}
@@ -392,8 +395,12 @@ async def list_knowledge(token: str = Depends(verify_admin_token)):
         
         # Convert to list format
         file_list = [{'filename': name, 'chunks': count} for name, count in files.items()]
+        print(f"Returning file list: {file_list}")
         return sorted(file_list, key=lambda x: x['filename'])
     except Exception as e:
+        print(f"Error in list_knowledge: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/admin/knowledge/{filename}")
