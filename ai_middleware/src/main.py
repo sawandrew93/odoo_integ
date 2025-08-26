@@ -98,10 +98,13 @@ async def handle_chat(chat_message: ChatMessage):
         odoo_session_id = None
         
         if handoff_needed:
-            # Create Odoo live chat session
+            # Get conversation history and create Odoo live chat session
+            conversation_history = ai_agent.get_conversation_history(chat_message.session_id)
+            full_message = f"Previous conversation:\n{conversation_history}\n\nLatest message: {chat_message.message}" if conversation_history else chat_message.message
+            
             odoo_session_id = odoo_client.create_live_chat_session(
                 visitor_name=chat_message.visitor_name,
-                message=chat_message.message
+                message=full_message
             )
             
             if odoo_session_id:
