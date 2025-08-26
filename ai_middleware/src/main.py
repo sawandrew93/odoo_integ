@@ -101,8 +101,8 @@ async def handle_chat(chat_message: ChatMessage):
             # Get conversation history and create Odoo live chat session
             conversation_history = ai_agent.get_conversation_history(chat_message.session_id)
             if conversation_history:
-                formatted_history = "\n".join([f"• {line}" for line in conversation_history.split("\n")])
-                full_message = f"📋 **Previous Conversation:**\n{formatted_history}\n\n🔹 **Current Request:** {chat_message.message}"
+                formatted_history = "<br/>".join([f"• {line}" for line in conversation_history.split("\n")])
+                full_message = f"<p><strong>📋 Previous Conversation:</strong></p><p>{formatted_history}</p><p><strong>🔹 Current Request:</strong> {chat_message.message}</p>"
             else:
                 full_message = chat_message.message
             

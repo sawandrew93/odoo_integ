@@ -48,42 +48,53 @@ class AIAgent:
             self.conversation_history[session_key].append(f"AI: {response}")
             return True, response, 0.0
         
-        # Handle greetings
-        greeting_words = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening']
-        if any(word in message_lower for word in greeting_words):
-            response = "Hello! How can I help you today?"
+        # Use AI to generate response based on knowledge base
+        try:
+            # Get relevant knowledge from knowledge base
+            relevant_docs = self.kb.search(message, top_k=3)
+            
+            # Create context from knowledge base
+            context = "\n".join([doc['content'] for doc in relevant_docs]) if relevant_docs else ""
+            
+            # Create AI prompt
+            prompt = f"""
+You are a helpful customer support assistant. Answer the user's question based on the provided knowledge base.
+
+Knowledge Base:
+{context}
+
+User Question: {message}
+
+Rules:
+1. Only answer based on the knowledge base provided
+2. If you don't have the information, say "I don't have information about that. I can connect you with our support representative if you want."
+3. Be concise and helpful
+4. For greetings, respond warmly
+5. If asked what you can help with, mention the topics you have knowledge about
+
+Response:"""
+            
+            # Generate response using Gemini
+            ai_response = self.model.generate_content(prompt)
+            response = ai_response.text.strip()
+            
+            # Check if AI says it doesn't have information
+            if "don't have information" in response.lower() or "i don't know" in response.lower():
+                self.pending_handoff[session_key] = True
+                response = "I don't have information about that. I can connect you with our support representative if you want."
+                self.conversation_history[session_key].append(f"AI: {response}")
+                return False, response, 0.3
+            else:
+                self.conversation_history[session_key].append(f"AI: {response}")
+                return False, response, 0.9
+                
+        except Exception as e:
+            print(f"AI generation error: {e}")
+            # Fallback to handoff offer
+            self.pending_handoff[session_key] = True
+            response = "I don't have information about that. I can connect you with our support representative if you want."
             self.conversation_history[session_key].append(f"AI: {response}")
-            return False, response, 0.9
-        elif 'how are you' in message_lower:
-            response = "I'm doing well, thank you! How can I assist you today?"
-            self.conversation_history[session_key].append(f"AI: {response}")
-            return False, response, 0.9
-        
-        # Handle meta questions about the AI
-        meta_questions = ['what can i ask', 'what can you answer', 'what do you know', 'what information do you have']
-        if any(meta in message_lower for meta in meta_questions):
-            response = "I can help you with questions about our business hours, return policy, password reset, and order tracking. What would you like to know?"
-            self.conversation_history[session_key].append(f"AI: {response}")
-            return False, response, 0.9
-        
-        # Search knowledge base with exact keyword matching first
-        response = None
-        if 'office hours' in message_lower or 'business hours' in message_lower:
-            response = "We are open Monday to Friday from 9 AM to 6 PM EST."
-        elif 'return policy' in message_lower or 'return' in message_lower:
-            response = "We accept returns within 30 days of purchase. Items must be in original condition."
-        elif 'password' in message_lower and 'reset' in message_lower:
-            response = "Click on 'Forgot Password' on the login page and follow the instructions sent to your email."
-        elif 'login page' in message_lower or ('login' in message_lower and ('page' in message_lower or 'find' in message_lower or 'where' in message_lower)):
-            response = "You can find the login page by clicking the 'Sign In' or 'Login' button at the top right of our website homepage."
-        elif 'track' in message_lower and 'order' in message_lower:
-            response = "You can track your order by logging into your account and visiting the Orders section."
-        elif 'order tracking' in message_lower:
-            response = "Order tracking allows you to see the status and location of your shipped items. You can access it by logging into your account."
-        
-        if response:
-            self.conversation_history[session_key].append(f"AI: {response}")
-            return False, response, 0.9
+            return False, response, 0.3
     
     def get_conversation_history(self, session_id: str = None) -> str:
         """Get formatted conversation history for a session"""
@@ -92,8 +103,3 @@ class AIAgent:
             return "\n".join(self.conversation_history[session_key])
         return ""
         
-        # For unknown questions, offer handoff
-        self.pending_handoff[session_key] = True
-        response = "I don't have information about that. I can connect you with our support representative if you want."
-        self.conversation_history[session_key].append(f"AI: {response}")
-        return False, response, 0.3
