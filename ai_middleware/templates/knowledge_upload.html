@@ -68,15 +68,15 @@
 
             const uploadBtn = document.getElementById('uploadBtn');
             uploadBtn.disabled = true;
-            uploadBtn.textContent = '⏳ Processing...';
+            uploadBtn.textContent = '⏳ Processing (may take several minutes)...';
             
             const progressDiv = document.createElement('div');
             progressDiv.id = 'progressDiv';
             progressDiv.style.cssText = 'background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; font-family: monospace; max-height: 300px; overflow-y: auto; border: 1px solid #ddd;';
-            progressDiv.innerHTML = '<div>📤 Starting file processing...</div>';
+            progressDiv.innerHTML = '<div>📤 Processing files... This may take several minutes due to rate limiting.</div><div>⚠️ Please do not refresh the page or upload more files.</div>';
             document.getElementById('status').appendChild(progressDiv);
             
-            showStatus('📤 Processing files - real-time progress below...');
+            showStatus('📤 Processing files - please wait...');
 
             const formData = new FormData();
             for (let file of files) {
@@ -85,14 +85,24 @@
 
             try {
                 const headers = getAuthHeaders();
-                if (!headers) return;
+                if (!headers) {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = '📤 Upload Files';
+                    return;
+                }
 
-                // Start upload to get session ID
+                // Set long timeout for embedding process
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 1800000); // 30 minutes
+
                 const response = await fetch('/admin/upload-knowledge', {
                     method: 'POST',
                     headers: headers,
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
                 
                 if (response.status === 401) {
                     localStorage.removeItem('admin_token');
@@ -102,57 +112,31 @@
                 
                 const result = await response.json();
                 
-                if (response.ok && result.session_id) {
-                    const sessionId = result.session_id;
-                    progressDiv.innerHTML = '<div>📤 Processing started, polling for updates...</div>';
-                    
-                    // Start progress polling with session ID
-                    progressInterval = setInterval(async () => {
-                        try {
-                            const progressResponse = await fetch(`/admin/upload-progress/${sessionId}`, {headers});
-                            if (progressResponse.ok) {
-                                const progress = await progressResponse.json();
-                                
-                                // Update progress display
-                                const messages = progress.messages || [];
-                                if (messages.length > 0) {
-                                    progressDiv.innerHTML = messages.map(msg => `<div>${msg}</div>`).join('');
-                                    progressDiv.scrollTop = progressDiv.scrollHeight;
-                                }
-                                
-                                if (progress.completed) {
-                                    clearInterval(progressInterval);
-                                    
-                                    // Show final status based on last message
-                                    const lastMessage = messages[messages.length - 1] || '';
-                                    if (lastMessage.includes('✅')) {
-                                        showStatus(`✅ ${lastMessage}`);
-                                    } else {
-                                        showStatus('⚠️ Processing completed with some issues. Check progress above.');
-                                    }
-                                    
-                                    fileInput.value = '';
-                                    document.getElementById('selectedFiles').innerHTML = '';
-                                    loadDocuments();
-                                }
-                            }
-                        } catch (e) {
-                            console.log('Polling error:', e);
-                        }
-                    }, 2000); // Poll every 2 seconds
-                    
+                if (response.ok) {
+                    showStatus('✅ Processing completed successfully!');
+                    progressDiv.innerHTML += '<div style="color: green; font-weight: bold;">✅ All files processed successfully!</div>';
+                    fileInput.value = '';
+                    document.getElementById('selectedFiles').innerHTML = '';
+                    loadDocuments();
                 } else {
                     showStatus(`❌ Error: ${result.detail || 'Upload failed'}`, true);
+                    progressDiv.innerHTML += '<div style="color: red;">❌ Processing failed. Check server logs for details.</div>';
                 }
             } catch (error) {
-                showStatus(`❌ Upload failed: ${error.message}`, true);
-            } finally {
-                if (progressInterval) {
-                    clearInterval(progressInterval);
-                    progressInterval = null;
+                if (error.name === 'AbortError') {
+                    showStatus('❌ Processing timed out after 30 minutes. Check server logs.', true);
+                    progressDiv.innerHTML += '<div style="color: orange;">⚠️ Processing may still be running in background. Check server logs.</div>';
+                } else {
+                    showStatus(`❌ Upload failed: ${error.message}`, true);
+                    progressDiv.innerHTML += '<div style="color: red;">❌ Upload failed. Please try again.</div>';
                 }
+            } finally {
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = '📤 Upload Files';
+                setTimeout(() => {
+                    const prog = document.getElementById('progressDiv');
+                    if (prog) prog.remove();
+                }, 30000);
             }
         }
         
