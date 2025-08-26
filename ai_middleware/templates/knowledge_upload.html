@@ -76,7 +76,7 @@
             progressDiv.innerHTML = '<div>📤 Processing files... This may take several minutes due to rate limiting.</div>';
             document.getElementById('status').appendChild(progressDiv);
             
-            showStatus('📤 Processing files - please wait...');
+            // Don't show duplicate status message
 
             const formData = new FormData();
             for (let file of files) {
@@ -110,18 +110,17 @@
                     return;
                 }
                 
+                const result = await response.json();
+                
                 if (response.ok) {
-                    const result = await response.json();
                     showStatus(`✅ ${result.message}`);
-                    progressDiv.innerHTML += '<div style="color: green; font-weight: bold;">✅ Processing completed!</div>';
+                    progressDiv.innerHTML = '<div style="color: green; font-weight: bold;">✅ Processing completed successfully!</div>';
                     fileInput.value = '';
                     document.getElementById('selectedFiles').innerHTML = '';
                     loadDocuments();
                 } else {
-                    const errorText = await response.text();
-                    console.log('Error response:', errorText);
-                    showStatus('❌ Processing failed. Check console for details.', true);
-                    progressDiv.innerHTML += '<div style="color: red;">❌ Processing failed.</div>';
+                    showStatus(`❌ Error: ${result.detail || 'Processing failed'}`, true);
+                    progressDiv.innerHTML = '<div style="color: red;">❌ Processing failed.</div>';
                 }
             } catch (error) {
                 if (error.name === 'AbortError') {
