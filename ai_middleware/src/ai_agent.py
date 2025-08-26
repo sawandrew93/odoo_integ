@@ -48,8 +48,8 @@ class AIAgent:
             self.conversation_history[session_key].append(f"AI: {response}")
             return True, response, 0.0
         
-        # Handle common patterns first
-        if any(word in message_lower for word in ['hi', 'hello', 'hey']):
+        # Handle basic greetings only
+        if any(word in message_lower for word in ['hi', 'hello', 'hey']) and len(message.split()) <= 2:
             response = "Hello! How can I help you today?"
             self.conversation_history[session_key].append(f"AI: {response}")
             return False, response, 0.9
@@ -57,22 +57,20 @@ class AIAgent:
             response = "I'm doing well, thank you! How can I assist you today?"
             self.conversation_history[session_key].append(f"AI: {response}")
             return False, response, 0.9
-        elif any(meta in message_lower for meta in ['what can i ask', 'what can you help', 'what do you know']):
-            response = "I can help you with questions about our business hours, return policy, password reset, and order tracking. What would you like to know?"
-            self.conversation_history[session_key].append(f"AI: {response}")
-            return False, response, 0.9
         
         # Use AI to generate response based on knowledge base
         try:
             # Get relevant knowledge from knowledge base
             relevant_docs = self.kb.search(message, top_k=3)
+            print(f"Found {len(relevant_docs)} relevant documents for: {message}")
             
             # Create context from knowledge base
             context = "\n".join([doc['content'] for doc in relevant_docs]) if relevant_docs else ""
+            print(f"Context length: {len(context)} characters")
             
             # Create AI prompt with better instructions
             prompt = f"""
-You are a helpful customer support assistant. Answer the user's question based on the provided knowledge base content.
+You are a helpful customer support assistant. Answer the user's question using ONLY the provided knowledge base content.
 
 Knowledge Base Content:
 {context}
@@ -80,12 +78,12 @@ Knowledge Base Content:
 User Question: {message}
 
 Instructions:
-- Extract and provide the specific information from the knowledge base that answers the user's question
-- Give a complete, helpful answer using the actual content from the knowledge base
-- If the knowledge base contains relevant information, provide the details, not just a reference
-- If no relevant information is found, respond with: "I don't have information about that. I can connect you with our support representative if you want."
-- Be specific and informative
-- Use the actual text content, not just page references
+- If the knowledge base contains information that answers the question, provide a detailed answer using that content
+- Quote or paraphrase the relevant information from the knowledge base
+- If the user asks what you can help with, mention the topics covered in the knowledge base
+- If no relevant information is found in the knowledge base, respond with: "I don't have information about that. I can connect you with our support representative if you want."
+- Do not make up information not in the knowledge base
+- Be helpful and specific
 
 Answer:"""
             

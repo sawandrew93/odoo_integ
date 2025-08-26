@@ -27,7 +27,9 @@
         <input type="file" id="fileInput" multiple accept=".pdf,.txt" style="display: none;">
     </div>
     
-    <button class="btn" onclick="uploadFiles()">📤 Upload Files</button>
+    <div id="selectedFiles" style="margin: 10px 0;"></div>
+    
+    <button class="btn" onclick="uploadFiles()" id="uploadBtn">📤 Upload Files</button>
     <button class="btn" onclick="loadDocuments()" style="margin-left: 10px;">🔄 Refresh List</button>
     
     <div id="status"></div>
@@ -62,6 +64,12 @@
                 return;
             }
 
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '⏳ Uploading & Processing...';
+            
+            showStatus('📤 Uploading files and creating embeddings...');
+
             const formData = new FormData();
             for (let file of files) {
                 formData.append('files', file);
@@ -86,16 +94,35 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showStatus(`✅ Successfully processed ${result.processed} files`);
+                    showStatus(`✅ Successfully processed ${result.processed} files and created embeddings`);
                     fileInput.value = '';
+                    document.getElementById('selectedFiles').innerHTML = '';
                     loadDocuments();
                 } else {
                     showStatus(`❌ Error: ${result.detail}`, true);
                 }
             } catch (error) {
                 showStatus(`❌ Upload failed: ${error.message}`, true);
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '📤 Upload Files';
             }
         }
+        
+        // Show selected files
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const files = e.target.files;
+            const selectedDiv = document.getElementById('selectedFiles');
+            
+            if (files.length > 0) {
+                const fileList = Array.from(files).map(file => 
+                    `<div style="background: #e9ecef; padding: 8px; margin: 5px 0; border-radius: 5px;">📄 ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)</div>`
+                ).join('');
+                selectedDiv.innerHTML = `<strong>Selected Files:</strong><br>${fileList}`;
+            } else {
+                selectedDiv.innerHTML = '';
+            }
+        });
 
         async function loadDocuments() {
             try {
