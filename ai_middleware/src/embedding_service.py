@@ -65,9 +65,10 @@ class EmbeddingService:
                 return embedding
                 
             except Exception as error:
-                if "429" in str(error) or "quota" in str(error).lower():
+                error_str = str(error)
+                if "429" in error_str or "quota" in error_str.lower() or "500" in error_str:
                     wait_time = (attempt + 1) * 60  # 60, 120, 180, 240, 300 seconds
-                    print(f"⏳ Rate limited. Waiting {wait_time} seconds (attempt {attempt + 1}/{max_retries})...")
+                    print(f"⏳ API error. Waiting {wait_time} seconds (attempt {attempt + 1}/{max_retries})...")
                     time.sleep(wait_time)
                     continue
                 else:

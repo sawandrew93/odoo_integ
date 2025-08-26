@@ -55,6 +55,8 @@
             return {'Authorization': `Bearer ${token}`};
         }
 
+        let progressInterval = null;
+        
         async function uploadFiles() {
             const fileInput = document.getElementById('fileInput');
             const files = fileInput.files;
@@ -66,15 +68,15 @@
 
             const uploadBtn = document.getElementById('uploadBtn');
             uploadBtn.disabled = true;
-            uploadBtn.textContent = '⏳ Processing (may take several minutes)...';
+            uploadBtn.textContent = '⏳ Processing...';
             
             const progressDiv = document.createElement('div');
             progressDiv.id = 'progressDiv';
-            progressDiv.style.cssText = 'background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; font-family: monospace; max-height: 200px; overflow-y: auto;';
-            progressDiv.innerHTML = '<div>📤 Starting file processing and embedding...</div><div>⚠️ This may take several minutes due to rate limiting</div>';
+            progressDiv.style.cssText = 'background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; font-family: monospace; max-height: 300px; overflow-y: auto; border: 1px solid #ddd;';
+            progressDiv.innerHTML = '<div>📤 Starting file processing...</div>';
             document.getElementById('status').appendChild(progressDiv);
             
-            showStatus('📤 Processing files - please wait...');
+            showStatus('📤 Processing files - real-time progress below...');
 
             const formData = new FormData();
             for (let file of files) {
@@ -85,18 +87,38 @@
                 const headers = getAuthHeaders();
                 if (!headers) return;
 
-                // Increase timeout to 10 minutes
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes
-
-                const response = await fetch('/admin/upload-knowledge', {
+                // Start upload (async)
+                const uploadPromise = fetch('/admin/upload-knowledge', {
                     method: 'POST',
                     headers: headers,
-                    body: formData,
-                    signal: controller.signal
+                    body: formData
                 });
                 
-                clearTimeout(timeoutId);
+                // Start progress polling immediately
+                let sessionId = null;
+                progressInterval = setInterval(async () => {
+                    if (sessionId) {
+                        try {
+                            const progressResponse = await fetch(`/admin/upload-progress/${sessionId}`, {headers});
+                            if (progressResponse.ok) {
+                                const progress = await progressResponse.json();
+                                
+                                // Update progress display
+                                const messages = progress.messages || [];
+                                progressDiv.innerHTML = messages.map(msg => `<div>${msg}</div>`).join('');
+                                progressDiv.scrollTop = progressDiv.scrollHeight;
+                                
+                                if (progress.completed) {
+                                    clearInterval(progressInterval);
+                                }
+                            }
+                        } catch (e) {
+                            // Ignore polling errors
+                        }
+                    }
+                }, 2000); // Poll every 2 seconds
+                
+                const response = await uploadPromise;
                 
                 if (response.status === 401) {
                     localStorage.removeItem('admin_token');
@@ -107,9 +129,12 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    // Show detailed progress if available
+                    sessionId = result.session_id;
+                    
+                    // Final update
                     if (result.progress) {
                         progressDiv.innerHTML = result.progress.map(msg => `<div>${msg}</div>`).join('');
+                        progressDiv.scrollTop = progressDiv.scrollHeight;
                     }
                     
                     showStatus(`✅ ${result.message}`);
@@ -120,18 +145,14 @@
                     showStatus(`❌ Error: ${result.detail}`, true);
                 }
             } catch (error) {
-                if (error.name === 'AbortError') {
-                    showStatus('❌ Upload timed out after 10 minutes. Check server logs for progress.', true);
-                } else {
-                    showStatus(`❌ Upload failed: ${error.message}`, true);
-                }
+                showStatus(`❌ Upload failed: ${error.message}`, true);
             } finally {
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                    progressInterval = null;
+                }
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = '📤 Upload Files';
-                setTimeout(() => {
-                    const prog = document.getElementById('progressDiv');
-                    if (prog) prog.remove();
-                }, 30000); // Keep progress visible longer
             }
         }
         
@@ -259,6 +280,9 @@
         }
 
         function logout() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
             localStorage.removeItem('admin_token');
             window.location.href = '/admin/login';
         }

@@ -82,6 +82,9 @@ class LoginRequest(BaseModel):
 # Simple token storage (in production, use Redis or database)
 valid_tokens = set()
 
+# Global progress tracking
+upload_progress = {}
+
 def create_chunks(text, filename="", chunk_size=1000, overlap=200):
     """Create overlapping chunks from text using sentence boundaries"""
     if not text or len(text.strip()) < 50:
@@ -275,6 +278,14 @@ async def get_connections():
         "monitoring_tasks": len(ws_manager.tasks)
     }
 
+@app.get("/admin/upload-progress/{session_id}")
+async def get_upload_progress(session_id: str, token: str = Depends(verify_admin_token)):
+    """Get real-time upload progress"""
+    if session_id not in upload_progress:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return upload_progress[session_id]
+
 def verify_admin_token(authorization: str = Header(None)):
     """Verify admin authentication token"""
     if not authorization:
@@ -371,9 +382,12 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
     
     # Process embeddings with progress tracking
     progress_messages = []
+    session_id = secrets.token_urlsafe(8)
+    upload_progress[session_id] = {"status": "processing", "messages": [], "completed": False}
     
     def progress_callback(message):
         progress_messages.append(message)
+        upload_progress[session_id]["messages"].append(message)
         print(message, flush=True)
     
     result = await embedding_service.generate_batch_embeddings(all_chunks, progress_callback)
@@ -400,13 +414,17 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
             except Exception as e:
                 print(f"❌ Error storing embedding: {e}", flush=True)
     
+    upload_progress[session_id]["completed"] = True
+    upload_progress[session_id]["status"] = "completed"
+    
     return {
         "processed": stored,
         "successful": result["successful"],
         "failed": result["failed"],
         "total": result["total"],
         "message": f"Successfully embedded {result['successful']} out of {result['total']} chunks. {result['failed']} failed.",
-        "progress": progress_messages
+        "progress": progress_messages,
+        "session_id": session_id
     }
 
 @app.get("/admin/knowledge-list")
