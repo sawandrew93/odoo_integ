@@ -22,12 +22,13 @@ class AIAgent:
         message_lower = message.lower().strip()
         
         # Check if user is responding to handoff offer
-        if session_id and session_id in self.pending_handoff:
+        session_key = session_id or 'default'
+        if session_key in self.pending_handoff:
             if any(word in message_lower for word in ['yes', 'okay', 'ok', 'sure', 'please']):
-                del self.pending_handoff[session_id]
-                return True, "I'll connect you with a human agent.", 0.0
+                del self.pending_handoff[session_key]
+                return True, "Connecting you with a human agent now...", 0.0
             elif any(word in message_lower for word in ['no', 'not now', 'later']):
-                del self.pending_handoff[session_id]
+                del self.pending_handoff[session_key]
                 return False, "No problem! How else can I help you?", 0.9
         
         # Check for explicit human agent requests
@@ -56,6 +57,6 @@ class AIAgent:
             return False, "You can track your order by logging into your account and visiting the Orders section.", 0.9
         
         # For unknown questions, offer handoff
-        if session_id:
-            self.pending_handoff[session_id] = True
+        session_key = session_id or 'default'
+        self.pending_handoff[session_key] = True
         return False, "I don't have information about that. I can connect you with our support representative if you want.", 0.3
