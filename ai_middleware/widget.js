@@ -55,7 +55,7 @@
             if (data.type === 'message') {
                 addMessage(`${data.data.author}: ${data.data.body}`);
             } else if (data.type === 'agent_joined') {
-                addMessage(`Agent joined the chat`, false, true);
+                addMessage(data.message, false, true);
             } else if (data.type === 'session_ended') {
                 addMessage(data.message, false, true);
                 sessionEnded = true;

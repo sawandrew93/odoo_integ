@@ -42,9 +42,11 @@ class AIAgent:
                 return False, response, 0.9
         
         # Check for explicit human agent requests
-        human_keywords = ['talk to support', 'speak to support', 'human agent', 'live agent', 'representative', 'talk to someone', 'speak to person', 'connect me', 'pls connect']
-        if any(keyword in message_lower for keyword in human_keywords) or ('support' in message_lower and ('talk' in message_lower or 'speak' in message_lower)):
-            return True, "I'll connect you with a human agent.", 0.0
+        human_keywords = ['talk to support', 'speak to support', 'human agent', 'live agent', 'representative', 'talk to someone', 'speak to person', 'connect me', 'pls connect', 'talk to agent']
+        if any(keyword in message_lower for keyword in human_keywords) or ('support' in message_lower and ('talk' in message_lower or 'speak' in message_lower)) or ('agent' in message_lower and ('talk' in message_lower or 'speak' in message_lower)):
+            response = "I'll connect you with a human agent."
+            self.conversation_history[session_key].append(f"AI: {response}")
+            return True, response, 0.0
         
         # Handle greetings
         greeting_words = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening']

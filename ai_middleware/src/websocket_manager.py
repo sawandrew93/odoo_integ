@@ -63,9 +63,11 @@ class WebSocketManager:
                     author = data['data']['author']
                     if not agent_joined and author != 'Website Visitor':
                         agent_joined = True
+                        # Store agent name for later use
+                        setattr(self, f'_agent_name_{session_id}', author)
                         await self.send_message(session_id, {
                             "type": "agent_joined",
-                            "data": {"agent_name": author}
+                            "message": f"{author} joined the chat"
                         })
                     
                     await self.send_message(session_id, data)
@@ -92,9 +94,11 @@ class WebSocketManager:
                 await asyncio.sleep(30)
                 
                 if not self.odoo_client.is_session_active(session_id):
+                    # Get the last known agent name for the left message
+                    agent_name = getattr(self, f'_agent_name_{session_id}', 'Agent')
                     await message_callback({
                         "type": "session_ended",
-                        "message": "Agent has left the chat"
+                        "message": f"{agent_name} left the channel"
                     })
                     break
                     
