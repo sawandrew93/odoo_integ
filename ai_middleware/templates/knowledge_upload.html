@@ -66,9 +66,14 @@
 
             const uploadBtn = document.getElementById('uploadBtn');
             uploadBtn.disabled = true;
-            uploadBtn.textContent = '⏳ Uploading & Processing...';
+            uploadBtn.textContent = '⏳ Processing...';
             
-            showStatus('📤 Uploading files and creating embeddings...');
+            const progressDiv = document.createElement('div');
+            progressDiv.id = 'progressDiv';
+            progressDiv.style.cssText = 'background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; font-family: monospace; max-height: 200px; overflow-y: auto;';
+            document.getElementById('status').appendChild(progressDiv);
+            
+            showStatus('📤 Starting file processing and embedding...');
 
             const formData = new FormData();
             for (let file of files) {
@@ -94,7 +99,12 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showStatus(`✅ Successfully processed ${result.processed} files and created embeddings`);
+                    // Show detailed progress if available
+                    if (result.progress) {
+                        progressDiv.innerHTML = result.progress.map(msg => `<div>${msg}</div>`).join('');
+                    }
+                    
+                    showStatus(`✅ ${result.message}`);
                     fileInput.value = '';
                     document.getElementById('selectedFiles').innerHTML = '';
                     loadDocuments();
@@ -106,6 +116,10 @@
             } finally {
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = '📤 Upload Files';
+                setTimeout(() => {
+                    const prog = document.getElementById('progressDiv');
+                    if (prog) prog.remove();
+                }, 10000);
             }
         }
         

@@ -332,45 +332,82 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
     if not ai_agent or not ai_agent.kb or not ai_agent.kb.supabase:
         raise HTTPException(status_code=500, detail="Knowledge base not properly configured. Please check Supabase credentials.")
     
-    processed = 0
+    from .embedding_service import EmbeddingService
+    embedding_service = EmbeddingService(os.getenv('GEMINI_API_KEY'))
     
+    all_chunks = []
+    
+    # First, extract and chunk all files
     for file in files:
         try:
             content = ""
             
             if file.filename.endswith('.pdf'):
-                # Extract text from PDF
                 pdf_content = await file.read()
                 pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
                 
                 full_text = ""
-                for page_num, page in enumerate(pdf_reader.pages):
+                for page in pdf_reader.pages:
                     page_text = page.extract_text()
                     if page_text.strip():
                         full_text += page_text + " "
                 
-                # Clean the text
-                content = ' '.join(full_text.split())  # Remove extra whitespace
+                content = ' '.join(full_text.split())
                     
             elif file.filename.endswith('.txt'):
-                # Read text file
                 content = (await file.read()).decode('utf-8')
             
             if content.strip():
-                # Create proper chunks using sentence-based chunking
                 chunks = create_chunks(content, file.filename)
-                print(f"📄 Processing {file.filename}: {len(chunks)} chunks", flush=True)
                 if chunks:
-                    ai_agent.kb.add_documents_with_filename(chunks)
-                    processed += 1
-                else:
-                    print(f"⚠️ No valid chunks found in {file.filename}", flush=True)
+                    all_chunks.extend(chunks)
                 
         except Exception as e:
             print(f"❌ Error processing {file.filename}: {e}", flush=True)
             continue
     
-    return {"processed": processed, "message": f"Successfully processed {processed} files"}
+    if not all_chunks:
+        return {"processed": 0, "message": "No valid chunks found"}
+    
+    # Process embeddings with progress tracking
+    progress_messages = []
+    
+    def progress_callback(message):
+        progress_messages.append(message)
+        print(message, flush=True)
+    
+    result = await embedding_service.generate_batch_embeddings(all_chunks, progress_callback)
+    
+    # Store successful embeddings in Supabase
+    stored = 0
+    for item in result["results"]:
+        if item["success"]:
+            try:
+                content_hash = hashlib.md5(item["content"].encode()).hexdigest()
+                
+                # Check if already exists
+                existing = ai_agent.kb.supabase.table('knowledge_embeddings').select('*').eq('content_hash', content_hash).execute()
+                
+                if not existing.data:
+                    ai_agent.kb.supabase.table('knowledge_embeddings').insert({
+                        'content': item["content"],
+                        'embedding': item["embedding"],
+                        'content_hash': content_hash,
+                        'filename': item["filename"]
+                    }).execute()
+                    stored += 1
+                    
+            except Exception as e:
+                print(f"❌ Error storing embedding: {e}", flush=True)
+    
+    return {
+        "processed": stored,
+        "successful": result["successful"],
+        "failed": result["failed"],
+        "total": result["total"],
+        "message": f"Successfully embedded {result['successful']} out of {result['total']} chunks. {result['failed']} failed.",
+        "progress": progress_messages
+    }
 
 @app.get("/admin/knowledge-list")
 async def list_knowledge(token: str = Depends(verify_admin_token)):
