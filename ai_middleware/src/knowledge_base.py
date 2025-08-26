@@ -5,6 +5,8 @@ import google.generativeai as genai
 from supabase import create_client, Client
 import hashlib
 import json
+import time
+import asyncio
 
 class KnowledgeBase:
     def __init__(self, api_key: str, supabase_url: str = None, supabase_key: str = None):
@@ -29,10 +31,10 @@ class KnowledgeBase:
         if not self.supabase:
             raise ConnectionError("Supabase not connected. Cannot add documents.")
         
-        print(f"Processing {len(documents)} documents for embedding...")
+        print(f"🚀 Processing {len(documents)} documents for embedding...", flush=True)
         
         for i, doc in enumerate(documents):
-            print(f"Processing document {i+1}/{len(documents)}: {len(doc)} chars")
+            print(f"📄 Processing document {i+1}/{len(documents)}: {len(doc)} chars", flush=True)
             content_hash = self._get_content_hash(doc)
             
             # Check if already exists
@@ -40,6 +42,11 @@ class KnowledgeBase:
             
             if not result.data:
                 try:
+                    # Add rate limiting delay
+                    print(f"⏳ Waiting 1 second before processing document {i+1}...", flush=True)
+                    time.sleep(1)  # 1 second delay between requests
+                    
+                    print(f"🔄 Creating embedding for document {i+1}...", flush=True)
                     # Create new embedding using Gemini's recommended approach
                     response = genai.embed_content(
                         model="models/embedding-001",
@@ -49,7 +56,7 @@ class KnowledgeBase:
                     )
                     embedding = response["embedding"]
                     
-                    print(f"Generated embedding with {len(embedding)} dimensions")
+                    print(f"✅ Generated embedding with {len(embedding)} dimensions", flush=True)
                     
                     # Store in Supabase
                     insert_result = self.supabase.table('knowledge_embeddings').insert({
@@ -62,15 +69,15 @@ class KnowledgeBase:
                         # Add to local cache
                         self.documents.append(doc)
                         self.embeddings.append(embedding)
-                        print(f"✅ Added document {i+1}: {doc[:100]}...")
+                        print(f"✅ Added document {i+1}: {doc[:100]}...", flush=True)
                     else:
-                        print(f"❌ Failed to insert document {i+1}")
+                        print(f"❌ Failed to insert document {i+1}", flush=True)
                         
                 except Exception as e:
-                    print(f"❌ Error processing document {i+1}: {e}")
+                    print(f"❌ Error processing document {i+1}: {e}", flush=True)
                     continue
             else:
-                print(f"⏭️ Document {i+1} already exists, skipping")
+                print(f"⏭️ Document {i+1} already exists, skipping", flush=True)
     
     def search(self, query: str, top_k: int = 3) -> List[dict]:
         """Semantic search using embeddings with Gemini's recommended approach"""

@@ -342,15 +342,15 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
             if content.strip():
                 # Create proper chunks using sentence-based chunking
                 chunks = create_chunks(content, file.filename)
-                print(f"📄 Processing {file.filename}: {len(chunks)} chunks")
+                print(f"📄 Processing {file.filename}: {len(chunks)} chunks", flush=True)
                 if chunks:
                     ai_agent.kb.add_documents(chunks)
                     processed += 1
                 else:
-                    print(f"⚠️ No valid chunks found in {file.filename}")
+                    print(f"⚠️ No valid chunks found in {file.filename}", flush=True)
                 
         except Exception as e:
-            print(f"Error processing {file.filename}: {e}")
+            print(f"❌ Error processing {file.filename}: {e}", flush=True)
             continue
     
     return {"processed": processed, "message": f"Successfully processed {processed} files"}
