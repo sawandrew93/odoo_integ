@@ -390,52 +390,66 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
     if not all_chunks:
         return {"processed": 0, "message": "No valid chunks found"}
     
-    # Process embeddings with progress tracking
-    progress_messages = []
+    # Generate session ID first and return it immediately
     session_id = secrets.token_urlsafe(8)
-    upload_progress[session_id] = {"status": "processing", "messages": [], "completed": False}
+    upload_progress[session_id] = {"status": "processing", "messages": ["📤 Starting file processing..."], "completed": False}
     
-    def progress_callback(message):
-        progress_messages.append(message)
-        upload_progress[session_id]["messages"].append(message)
-        print(message, flush=True)
+    # Return session ID immediately so frontend can start polling
+    from fastapi.responses import JSONResponse
+    import asyncio
     
-    result = await embedding_service.generate_batch_embeddings(all_chunks, progress_callback)
+    # Start background processing
+    async def process_embeddings():
+        progress_messages = []
+        
+        def progress_callback(message):
+            progress_messages.append(message)
+            upload_progress[session_id]["messages"].append(message)
+            print(message, flush=True)
     
-    # Store successful embeddings in Supabase
-    stored = 0
-    for item in result["results"]:
-        if item["success"]:
-            try:
-                content_hash = hashlib.md5(item["content"].encode()).hexdigest()
-                
-                # Check if already exists
-                existing = ai_agent.kb.supabase.table('knowledge_embeddings').select('*').eq('content_hash', content_hash).execute()
-                
-                if not existing.data:
-                    ai_agent.kb.supabase.table('knowledge_embeddings').insert({
-                        'content': item["content"],
-                        'embedding': item["embedding"],
-                        'content_hash': content_hash,
-                        'filename': item["filename"]
-                    }).execute()
-                    stored += 1
+        result = await embedding_service.generate_batch_embeddings(all_chunks, progress_callback)
+        
+        # Store successful embeddings in Supabase
+        stored = 0
+        for item in result["results"]:
+            if item["success"]:
+                try:
+                    content_hash = hashlib.md5(item["content"].encode()).hexdigest()
                     
-            except Exception as e:
-                print(f"❌ Error storing embedding: {e}", flush=True)
+                    # Check if already exists
+                    existing = ai_agent.kb.supabase.table('knowledge_embeddings').select('*').eq('content_hash', content_hash).execute()
+                    
+                    if not existing.data:
+                        ai_agent.kb.supabase.table('knowledge_embeddings').insert({
+                            'content': item["content"],
+                            'embedding': item["embedding"],
+                            'content_hash': content_hash,
+                            'filename': item["filename"]
+                        }).execute()
+                        stored += 1
+                        
+                except Exception as e:
+                    print(f"❌ Error storing embedding: {e}", flush=True)
+        
+        upload_progress[session_id]["completed"] = True
+        upload_progress[session_id]["status"] = "completed"
+        upload_progress[session_id]["messages"].append(f"✅ Successfully embedded {result['successful']} out of {result['total']} chunks. {result['failed']} failed.")
+        
+        return {
+            "processed": stored,
+            "successful": result["successful"],
+            "failed": result["failed"],
+            "total": result["total"],
+            "message": f"Successfully embedded {result['successful']} out of {result['total']} chunks. {result['failed']} failed."
+        }
     
-    upload_progress[session_id]["completed"] = True
-    upload_progress[session_id]["status"] = "completed"
+    # Start processing in background
+    asyncio.create_task(process_embeddings())
     
-    return {
-        "processed": stored,
-        "successful": result["successful"],
-        "failed": result["failed"],
-        "total": result["total"],
-        "message": f"Successfully embedded {result['successful']} out of {result['total']} chunks. {result['failed']} failed.",
-        "progress": progress_messages,
-        "session_id": session_id
-    }
+    # Return session ID immediately
+    return {"session_id": session_id, "message": "Processing started", "status": "processing"}
+    
+
 
 @app.get("/admin/knowledge-list")
 async def list_knowledge(token: str = Depends(verify_admin_token)):
