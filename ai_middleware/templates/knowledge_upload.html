@@ -220,7 +220,14 @@
                         return;
                     }
                     
-                    const chunks = await response.json();
+                    const result = await response.json();
+                    const chunks = Array.isArray(result) ? result : (result.data || []);
+                    
+                    if (chunks.length === 0) {
+                        chunkDiv.innerHTML = '<p>No chunks found for this file.</p>';
+                        chunkDiv.style.display = 'block';
+                        return;
+                    }
                     
                     chunkDiv.innerHTML = chunks.map((chunk, index) => `
                         <div style="margin: 5px 0; padding: 8px; background: white; border-radius: 3px; border-left: 3px solid #007bff;">

@@ -356,6 +356,20 @@ async def delete_knowledge_file(filename: str, token: str = Depends(verify_admin
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/admin/knowledge/{filename}/chunks")
+async def get_file_chunks(filename: str, token: str = Depends(verify_admin_token)):
+    """Get all chunks for a specific file (protected)"""
+    if not ai_agent or not ai_agent.kb or not ai_agent.kb.supabase:
+        raise HTTPException(status_code=500, detail="Knowledge base not properly configured. Please check Supabase credentials.")
+    
+    try:
+        result = ai_agent.kb.supabase.table('knowledge_embeddings').select('id, content').eq('filename', filename).execute()
+        chunks = result.data if result.data else []
+        return chunks
+    except Exception as e:
+        print(f"Error getting chunks: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
