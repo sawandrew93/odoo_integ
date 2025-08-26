@@ -10,6 +10,7 @@ import PyPDF2
 import io
 import secrets
 import hashlib
+import re
 
 from .odoo_client import OdooClient
 from .ai_agent import AIAgent
@@ -72,6 +73,45 @@ class LoginRequest(BaseModel):
 
 # Simple token storage (in production, use Redis or database)
 valid_tokens = set()
+
+def create_chunks(text, filename="", chunk_size=1000, overlap=200):
+    """Create overlapping chunks from text using sentence boundaries"""
+    if not text or len(text.strip()) < 50:
+        return []
+    
+    # Split into sentences
+    sentences = re.split(r'[.!?]+', text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+    
+    chunks = []
+    current_chunk = ""
+    current_length = 0
+    
+    for sentence in sentences:
+        sentence_length = len(sentence)
+        
+        # If adding this sentence exceeds chunk size, save current chunk
+        if current_length + sentence_length > chunk_size and current_chunk:
+            chunks.append(current_chunk.strip())
+            
+            # Start new chunk with overlap
+            words = current_chunk.split()
+            overlap_words = words[-overlap//5:] if len(words) > overlap//5 else words
+            current_chunk = ' '.join(overlap_words) + ' ' + sentence
+            current_length = len(current_chunk)
+        else:
+            current_chunk += ' ' + sentence
+            current_length = len(current_chunk)
+    
+    # Add final chunk
+    if current_chunk.strip():
+        chunks.append(current_chunk.strip())
+    
+    # Filter out very short chunks
+    chunks = [chunk for chunk in chunks if len(chunk) > 100]
+    
+    print(f"Created {len(chunks)} chunks from {len(text)} characters")
+    return chunks
 
 @app.post("/chat", response_model=ChatResponse)
 async def handle_chat(chat_message: ChatMessage):
@@ -286,18 +326,22 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
                 pdf_content = await file.read()
                 pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
                 
+                full_text = ""
                 for page_num, page in enumerate(pdf_reader.pages):
                     page_text = page.extract_text()
-                    if page_text.strip():  # Only add non-empty pages
-                        content += f"Page {page_num + 1}:\n{page_text}\n\n"
+                    if page_text.strip():
+                        full_text += page_text + " "
+                
+                # Clean the text
+                content = ' '.join(full_text.split())  # Remove extra whitespace
                     
             elif file.filename.endswith('.txt'):
                 # Read text file
                 content = (await file.read()).decode('utf-8')
             
             if content.strip():
-                # Split into chunks and add to knowledge base
-                chunks = [chunk.strip() for chunk in content.split('\n\n') if chunk.strip() and len(chunk.strip()) > 50]
+                # Create proper chunks using sentence-based chunking
+                chunks = create_chunks(content, file.filename)
                 print(f"📄 Processing {file.filename}: {len(chunks)} chunks")
                 if chunks:
                     ai_agent.kb.add_documents(chunks)

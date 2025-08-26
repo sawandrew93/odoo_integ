@@ -43,16 +43,23 @@ class KnowledgeBase:
                 )["embedding"]
                 
                 # Store in Supabase
-                insert_result = self.supabase.table('knowledge_embeddings').insert({
-                    'content': doc,
-                    'embedding': embedding,  # Store as array, not JSON string
-                    'content_hash': content_hash
-                }).execute()
-                
-                # Add to local cache
-                self.documents.append(doc)
-                self.embeddings.append(embedding)
-                print(f"✅ Added new document: {doc[:50]}...")
+                try:
+                    insert_result = self.supabase.table('knowledge_embeddings').insert({
+                        'content': doc,
+                        'embedding': embedding,  # Store as array, not JSON string
+                        'content_hash': content_hash
+                    }).execute()
+                    
+                    if insert_result.data:
+                        # Add to local cache
+                        self.documents.append(doc)
+                        self.embeddings.append(embedding)
+                        print(f"✅ Added new document: {doc[:50]}...")
+                    else:
+                        print(f"❌ Failed to insert document: {doc[:50]}...")
+                except Exception as e:
+                    print(f"❌ Error inserting document: {e}")
+                    raise
     
     def search(self, query: str, top_k: int = 3) -> List[dict]:
         """Semantic search using embeddings"""
