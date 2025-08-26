@@ -34,7 +34,9 @@ odoo_client = OdooClient(
 
 ai_agent = AIAgent(
     api_key=os.getenv('GEMINI_API_KEY'),
-    confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', 0.7))
+    confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', 0.7)),
+    supabase_url=os.getenv('SUPABASE_URL'),
+    supabase_key=os.getenv('SUPABASE_KEY')
 )
 
 # Load knowledge base on startup

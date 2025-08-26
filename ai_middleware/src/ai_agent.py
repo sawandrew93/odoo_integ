@@ -4,12 +4,12 @@ import google.generativeai as genai
 from .knowledge_base import KnowledgeBase
 
 class AIAgent:
-    def __init__(self, api_key: str, confidence_threshold: float = 0.7):
+    def __init__(self, api_key: str, confidence_threshold: float = 0.7, supabase_url: str = None, supabase_key: str = None):
         self.api_key = api_key
         self.confidence_threshold = confidence_threshold
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        self.kb = KnowledgeBase(api_key)
+        self.kb = KnowledgeBase(api_key, supabase_url, supabase_key)
         self.system_message = "You are a customer support AI. Only answer questions based on the provided knowledge base. If you don't have the information, say you don't have it and offer to connect with a support representative."
         self.pending_handoff = {}
         self.conversation_history = {}
