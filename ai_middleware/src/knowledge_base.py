@@ -33,51 +33,61 @@ class KnowledgeBase:
         
         print(f"🚀 Processing {len(documents)} documents for embedding...", flush=True)
         
-        for i, doc in enumerate(documents):
-            print(f"📄 Processing document {i+1}/{len(documents)}: {len(doc)} chars", flush=True)
-            content_hash = self._get_content_hash(doc)
+        # Process in batches like your JavaScript code
+        batch_size = 5
+        for batch_start in range(0, len(documents), batch_size):
+            batch_end = min(batch_start + batch_size, len(documents))
+            batch = documents[batch_start:batch_end]
             
-            # Check if already exists
-            result = self.supabase.table('knowledge_embeddings').select('*').eq('content_hash', content_hash).execute()
+            print(f"📦 Processing batch {batch_start//batch_size + 1}/{(len(documents) + batch_size - 1)//batch_size}", flush=True)
             
-            if not result.data:
-                try:
-                    # Add rate limiting delay
-                    print(f"⏳ Waiting 5 seconds before processing document {i+1}...", flush=True)
-                    time.sleep(5)  # 5 second delay = 12 requests/minute (under 15 limit)
-                    
-                    print(f"🔄 Creating embedding for document {i+1}...", flush=True)
-                    # Create new embedding using Gemini's recommended approach
-                    response = genai.embed_content(
-                        model="models/embedding-001",
-                        content=doc,
-                        task_type="retrieval_document",
-                        title="Knowledge Base Document"
-                    )
-                    embedding = response["embedding"]
-                    
-                    print(f"✅ Generated embedding with {len(embedding)} dimensions", flush=True)
-                    
-                    # Store in Supabase
-                    insert_result = self.supabase.table('knowledge_embeddings').insert({
-                        'content': doc,
-                        'embedding': embedding,
-                        'content_hash': content_hash
-                    }).execute()
-                    
-                    if insert_result.data:
-                        # Add to local cache
-                        self.documents.append(doc)
-                        self.embeddings.append(embedding)
-                        print(f"✅ Added document {i+1}: {doc[:100]}...", flush=True)
-                    else:
-                        print(f"❌ Failed to insert document {i+1}", flush=True)
+            for i, doc in enumerate(batch):
+                doc_index = batch_start + i + 1
+                print(f"📄 Processing document {doc_index}/{len(documents)}: {len(doc)} chars", flush=True)
+                content_hash = self._get_content_hash(doc)
+                
+                # Check if already exists
+                result = self.supabase.table('knowledge_embeddings').select('*').eq('content_hash', content_hash).execute()
+                
+                if not result.data:
+                    try:
+                        print(f"🔄 Creating embedding for document {doc_index}...", flush=True)
+                        # Create new embedding using Gemini's recommended approach
+                        response = genai.embed_content(
+                            model="models/embedding-001",
+                            content=doc,
+                            task_type="retrieval_document",
+                            title="Knowledge Base Document"
+                        )
+                        embedding = response["embedding"]
                         
-                except Exception as e:
-                    print(f"❌ Error processing document {i+1}: {e}", flush=True)
-                    continue
-            else:
-                print(f"⏭️ Document {i+1} already exists, skipping", flush=True)
+                        print(f"✅ Generated embedding with {len(embedding)} dimensions", flush=True)
+                        
+                        # Store in Supabase
+                        insert_result = self.supabase.table('knowledge_embeddings').insert({
+                            'content': doc,
+                            'embedding': embedding,
+                            'content_hash': content_hash
+                        }).execute()
+                        
+                        if insert_result.data:
+                            # Add to local cache
+                            self.documents.append(doc)
+                            self.embeddings.append(embedding)
+                            print(f"✅ Added document {doc_index}: {doc[:100]}...", flush=True)
+                        else:
+                            print(f"❌ Failed to insert document {doc_index}", flush=True)
+                            
+                    except Exception as e:
+                        print(f"❌ Error processing document {doc_index}: {e}", flush=True)
+                        continue
+                else:
+                    print(f"⏭️ Document {doc_index} already exists, skipping", flush=True)
+            
+            # Rate limiting delay between batches (like your JS code)
+            if batch_end < len(documents):
+                print(f"⏳ Waiting 10 seconds before next batch...", flush=True)
+                time.sleep(10)  # 10 second delay between batches
     
     def search(self, query: str, top_k: int = 3) -> List[dict]:
         """Semantic search using embeddings with Gemini's recommended approach"""
