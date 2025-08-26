@@ -279,8 +279,18 @@ async def get_connections():
     }
 
 @app.get("/admin/upload-progress/{session_id}")
-async def get_upload_progress(session_id: str, token: str = Depends(verify_admin_token)):
+async def get_upload_progress(session_id: str, authorization: str = Header(None)):
     """Get real-time upload progress"""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    
+    try:
+        token = authorization.replace('Bearer ', '')
+        if token not in valid_tokens:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except:
+        raise HTTPException(status_code=401, detail="Invalid authorization format")
+    
     if session_id not in upload_progress:
         raise HTTPException(status_code=404, detail="Session not found")
     
