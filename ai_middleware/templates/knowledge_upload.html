@@ -73,7 +73,7 @@
             const progressDiv = document.createElement('div');
             progressDiv.id = 'progressDiv';
             progressDiv.style.cssText = 'background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 5px; font-family: monospace; max-height: 300px; overflow-y: auto; border: 1px solid #ddd;';
-            progressDiv.innerHTML = '<div>📤 Processing files... This may take several minutes due to rate limiting.</div><div>⚠️ Please do not refresh the page or upload more files.</div>';
+            progressDiv.innerHTML = '<div>📤 Processing files... This may take several minutes due to rate limiting.</div>';
             document.getElementById('status').appendChild(progressDiv);
             
             showStatus('📤 Processing files - please wait...');
@@ -110,17 +110,18 @@
                     return;
                 }
                 
-                const result = await response.json();
-                
                 if (response.ok) {
-                    showStatus('✅ Processing completed successfully!');
-                    progressDiv.innerHTML += '<div style="color: green; font-weight: bold;">✅ All files processed successfully!</div>';
+                    const result = await response.json();
+                    showStatus(`✅ ${result.message}`);
+                    progressDiv.innerHTML += '<div style="color: green; font-weight: bold;">✅ Processing completed!</div>';
                     fileInput.value = '';
                     document.getElementById('selectedFiles').innerHTML = '';
                     loadDocuments();
                 } else {
-                    showStatus(`❌ Error: ${result.detail || 'Upload failed'}`, true);
-                    progressDiv.innerHTML += '<div style="color: red;">❌ Processing failed. Check server logs for details.</div>';
+                    const errorText = await response.text();
+                    console.log('Error response:', errorText);
+                    showStatus('❌ Processing failed. Check console for details.', true);
+                    progressDiv.innerHTML += '<div style="color: red;">❌ Processing failed.</div>';
                 }
             } catch (error) {
                 if (error.name === 'AbortError') {
