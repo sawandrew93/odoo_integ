@@ -28,25 +28,33 @@ class KnowledgeBase:
         """Add documents to knowledge base with embeddings via Supabase"""
         if not self.supabase:
             raise ConnectionError("Supabase not connected. Cannot add documents.")
-            
-        for doc in documents:
+        
+        print(f"Processing {len(documents)} documents for embedding...")
+        
+        for i, doc in enumerate(documents):
+            print(f"Processing document {i+1}/{len(documents)}: {len(doc)} chars")
             content_hash = self._get_content_hash(doc)
             
             # Check if already exists
             result = self.supabase.table('knowledge_embeddings').select('*').eq('content_hash', content_hash).execute()
             
             if not result.data:
-                # Create new embedding
-                embedding = genai.embed_content(
-                    model="models/embedding-001",
-                    content=doc
-                )["embedding"]
-                
-                # Store in Supabase
                 try:
+                    # Create new embedding using Gemini's recommended approach
+                    response = genai.embed_content(
+                        model="models/embedding-001",
+                        content=doc,
+                        task_type="retrieval_document",
+                        title="Knowledge Base Document"
+                    )
+                    embedding = response["embedding"]
+                    
+                    print(f"Generated embedding with {len(embedding)} dimensions")
+                    
+                    # Store in Supabase
                     insert_result = self.supabase.table('knowledge_embeddings').insert({
                         'content': doc,
-                        'embedding': embedding,  # Store as array, not JSON string
+                        'embedding': embedding,
                         'content_hash': content_hash
                     }).execute()
                     
@@ -54,42 +62,70 @@ class KnowledgeBase:
                         # Add to local cache
                         self.documents.append(doc)
                         self.embeddings.append(embedding)
-                        print(f"✅ Added new document: {doc[:50]}...")
+                        print(f"✅ Added document {i+1}: {doc[:100]}...")
                     else:
-                        print(f"❌ Failed to insert document: {doc[:50]}...")
+                        print(f"❌ Failed to insert document {i+1}")
+                        
                 except Exception as e:
-                    print(f"❌ Error inserting document: {e}")
-                    raise
+                    print(f"❌ Error processing document {i+1}: {e}")
+                    continue
+            else:
+                print(f"⏭️ Document {i+1} already exists, skipping")
     
     def search(self, query: str, top_k: int = 3) -> List[dict]:
-        """Semantic search using embeddings"""
+        """Semantic search using embeddings with Gemini's recommended approach"""
         if not self.supabase:
             print(f"❌ Supabase not connected. Cannot search knowledge base.")
             return []
             
-        if not self.documents:
-            print(f"No documents loaded in knowledge base")
-            return []
-            
+        # Load all documents from Supabase for search
         try:
-            query_embedding = genai.embed_content(
+            all_docs = self.supabase.table('knowledge_embeddings').select('*').execute()
+            if not all_docs.data:
+                print(f"No documents in knowledge base")
+                return []
+            
+            print(f"Searching through {len(all_docs.data)} documents for: {query}")
+            
+            # Generate query embedding
+            query_response = genai.embed_content(
                 model="models/embedding-001",
-                content=query
-            )["embedding"]
+                content=query,
+                task_type="retrieval_query"
+            )
+            query_embedding = query_response["embedding"]
             
             similarities = []
-            for i, doc_embedding in enumerate(self.embeddings):
+            for doc in all_docs.data:
+                doc_embedding = doc['embedding']
+                
+                # Handle both array and JSON string formats
+                if isinstance(doc_embedding, str):
+                    doc_embedding = json.loads(doc_embedding)
+                
+                # Calculate cosine similarity
                 similarity = np.dot(query_embedding, doc_embedding) / (
                     np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding)
                 )
-                similarities.append({'content': self.documents[i], 'score': similarity})
+                
+                similarities.append({
+                    'content': doc['content'], 
+                    'score': similarity,
+                    'id': doc['id']
+                })
             
+            # Sort by similarity score
             similarities.sort(key=lambda x: x['score'], reverse=True)
-            print(f"Found {len(similarities)} documents for query: {query}")
+            
+            # Log top results
+            print(f"Top {min(top_k, len(similarities))} results:")
+            for i, result in enumerate(similarities[:top_k]):
+                print(f"  {i+1}. Score: {result['score']:.3f} - {result['content'][:100]}...")
+            
             return similarities[:top_k]
             
         except Exception as e:
-            print(f"Embedding search error: {e}")
+            print(f"Search error: {e}")
             return []
     
 
