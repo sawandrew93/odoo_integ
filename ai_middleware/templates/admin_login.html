@@ -39,6 +39,8 @@
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             
+            console.log('Attempting login with username:', username);
+            
             try {
                 const response = await fetch('/admin/login', {
                     method: 'POST',
@@ -46,15 +48,19 @@
                     body: JSON.stringify({username, password})
                 });
                 
+                console.log('Response status:', response.status);
                 const result = await response.json();
+                console.log('Response data:', result);
                 
                 if (response.ok) {
                     localStorage.setItem('admin_token', result.token);
+                    console.log('Token stored, redirecting...');
                     window.location.href = '/admin';
                 } else {
                     showError(result.detail || 'Login failed');
                 }
             } catch (error) {
+                console.error('Login error:', error);
                 showError('Login failed: ' + error.message);
             }
         }

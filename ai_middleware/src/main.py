@@ -259,24 +259,13 @@ async def admin_login(login_data: LoginRequest):
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_panel(authorization: str = Header(None)):
-    """Knowledge base admin panel with auth check"""
-    # Check if user is authenticated
-    if not authorization:
-        return RedirectResponse(url="/admin/login")
-    
-    try:
-        token = authorization.replace('Bearer ', '')
-        if token not in valid_tokens:
-            return RedirectResponse(url="/admin/login")
-    except:
-        return RedirectResponse(url="/admin/login")
-    
-    # User is authenticated, show admin panel
+@app.get("/admin")
+async def admin_panel():
+    """Knowledge base admin panel - handles auth via JavaScript"""
+    # Always serve the admin panel, let JavaScript handle auth check
     template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'knowledge_upload.html')
     with open(template_path, 'r', encoding='utf-8') as f:
-        return f.read()
+        return HTMLResponse(content=f.read())
 
 @app.get("/admin/")
 async def admin_redirect():
