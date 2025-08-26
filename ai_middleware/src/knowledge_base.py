@@ -28,6 +28,12 @@ class KnowledgeBase:
         
     def add_documents(self, documents: List[str]):
         """Add documents to knowledge base with embeddings via Supabase"""
+        # Convert string documents to dict format for backward compatibility
+        doc_objects = [{'content': doc, 'filename': 'legacy'} for doc in documents]
+        return self.add_documents_with_filename(doc_objects)
+    
+    def add_documents_with_filename(self, documents: List[dict]):
+        """Add documents with filename to knowledge base with embeddings via Supabase"""
         if not self.supabase:
             raise ConnectionError("Supabase not connected. Cannot add documents.")
         
@@ -41,10 +47,12 @@ class KnowledgeBase:
             
             print(f"📦 Processing batch {batch_start//batch_size + 1}/{(len(documents) + batch_size - 1)//batch_size}", flush=True)
             
-            for i, doc in enumerate(batch):
+            for i, doc_obj in enumerate(batch):
                 doc_index = batch_start + i + 1
-                print(f"📄 Processing document {doc_index}/{len(documents)}: {len(doc)} chars", flush=True)
-                content_hash = self._get_content_hash(doc)
+                content = doc_obj['content']
+                filename = doc_obj['filename']
+                print(f"📄 Processing document {doc_index}/{len(documents)}: {len(content)} chars from {filename}", flush=True)
+                content_hash = self._get_content_hash(content)
                 
                 # Check if already exists
                 result = self.supabase.table('knowledge_embeddings').select('*').eq('content_hash', content_hash).execute()
@@ -55,7 +63,7 @@ class KnowledgeBase:
                         # Create new embedding using Gemini's recommended approach
                         response = genai.embed_content(
                             model="models/embedding-001",
-                            content=doc,
+                            content=content,
                             task_type="retrieval_document",
                             title="Knowledge Base Document"
                         )
@@ -63,18 +71,19 @@ class KnowledgeBase:
                         
                         print(f"✅ Generated embedding with {len(embedding)} dimensions", flush=True)
                         
-                        # Store in Supabase
+                        # Store in Supabase with filename
                         insert_result = self.supabase.table('knowledge_embeddings').insert({
-                            'content': doc,
+                            'content': content,
                             'embedding': embedding,
-                            'content_hash': content_hash
+                            'content_hash': content_hash,
+                            'filename': filename
                         }).execute()
                         
                         if insert_result.data:
                             # Add to local cache
-                            self.documents.append(doc)
+                            self.documents.append(content)
                             self.embeddings.append(embedding)
-                            print(f"✅ Added document {doc_index}: {doc[:100]}...", flush=True)
+                            print(f"✅ Added document {doc_index}: {content[:100]}...", flush=True)
                         else:
                             print(f"❌ Failed to insert document {doc_index}", flush=True)
                             
@@ -211,7 +220,8 @@ class KnowledgeBase:
                     self.supabase.table('knowledge_embeddings').insert({
                         'content': doc,
                         'embedding': embedding,  # Store as array
-                        'content_hash': content_hash
+                        'content_hash': content_hash,
+                        'filename': 'legacy'
                     }).execute()
                     
                     self.documents.append(doc)

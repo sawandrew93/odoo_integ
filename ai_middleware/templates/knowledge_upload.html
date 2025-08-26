@@ -137,19 +137,21 @@
                     return;
                 }
                 
-                const docs = await response.json();
+                const files = await response.json();
                 
                 const list = document.getElementById('documentsList');
-                if (docs.length === 0) {
-                    list.innerHTML = '<p>No documents in knowledge base</p>';
+                if (files.length === 0) {
+                    list.innerHTML = '<p>No files in knowledge base</p>';
                     return;
                 }
                 
-                list.innerHTML = docs.map(doc => `
+                list.innerHTML = files.map(file => `
                     <div class="doc-item">
-                        <button class="delete-btn" onclick="deleteDocument('${doc.id}')">🗑️</button>
-                        <strong>ID:</strong> ${doc.id}<br>
-                        <strong>Content:</strong> ${doc.content.substring(0, 200)}...
+                        <button class="delete-btn" onclick="deleteFile('${file.filename}')">🗑️ Delete File</button>
+                        <strong>📄 File:</strong> ${file.filename}<br>
+                        <strong>📊 Chunks:</strong> ${file.chunks}
+                        <button onclick="viewChunks('${file.filename}')" style="margin-left: 10px; padding: 3px 8px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;">👁️ View Chunks</button>
+                        <div id="chunks-${file.filename.replace(/[^a-zA-Z0-9]/g, '_')}" style="display: none; margin-top: 10px; background: #f1f3f4; padding: 10px; border-radius: 5px;"></div>
                     </div>
                 `).join('');
             } catch (error) {
@@ -157,14 +159,14 @@
             }
         }
 
-        async function deleteDocument(id) {
-            if (!confirm('Delete this document?')) return;
+        async function deleteFile(filename) {
+            if (!confirm(`Delete all chunks from "${filename}"? This cannot be undone.`)) return;
             
             try {
                 const headers = getAuthHeaders();
                 if (!headers) return;
 
-                const response = await fetch(`/admin/knowledge/${id}`, { 
+                const response = await fetch(`/admin/knowledge/${encodeURIComponent(filename)}`, { 
                     method: 'DELETE',
                     headers: headers
                 });
@@ -176,13 +178,49 @@
                 }
                 
                 if (response.ok) {
-                    showStatus('✅ Document deleted');
+                    const result = await response.json();
+                    showStatus(`✅ ${result.message}`);
                     loadDocuments();
                 } else {
-                    showStatus('❌ Failed to delete document', true);
+                    showStatus('❌ Failed to delete file', true);
                 }
             } catch (error) {
                 showStatus(`❌ Delete failed: ${error.message}`, true);
+            }
+        }
+
+        async function viewChunks(filename) {
+            const chunkId = `chunks-${filename.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const chunkDiv = document.getElementById(chunkId);
+            
+            if (chunkDiv.style.display === 'none') {
+                try {
+                    const headers = getAuthHeaders();
+                    if (!headers) return;
+
+                    const response = await fetch(`/admin/knowledge/${encodeURIComponent(filename)}/chunks`, {headers});
+                    
+                    if (response.status === 401) {
+                        localStorage.removeItem('admin_token');
+                        window.location.href = '/admin/login';
+                        return;
+                    }
+                    
+                    const chunks = await response.json();
+                    
+                    chunkDiv.innerHTML = chunks.map((chunk, index) => `
+                        <div style="margin: 5px 0; padding: 8px; background: white; border-radius: 3px; border-left: 3px solid #007bff;">
+                            <strong>Chunk ${index + 1} (ID: ${chunk.id}):</strong><br>
+                            <div style="margin-top: 5px; font-size: 0.9em;">${chunk.content.substring(0, 300)}${chunk.content.length > 300 ? '...' : ''}</div>
+                        </div>
+                    `).join('');
+                    
+                    chunkDiv.style.display = 'block';
+                } catch (error) {
+                    showStatus(`❌ Failed to load chunks: ${error.message}`, true);
+                }
+            } else {
+                chunkDiv.style.display = 'none';
             }
         }
 

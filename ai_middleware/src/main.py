@@ -92,7 +92,7 @@ def create_chunks(text, filename="", chunk_size=1000, overlap=200):
         
         # If adding this sentence exceeds chunk size, save current chunk
         if current_length + sentence_length > chunk_size and current_chunk:
-            chunks.append(current_chunk.strip())
+            chunks.append({"content": current_chunk.strip(), "filename": filename})
             
             # Start new chunk with overlap
             words = current_chunk.split()
@@ -105,10 +105,10 @@ def create_chunks(text, filename="", chunk_size=1000, overlap=200):
     
     # Add final chunk
     if current_chunk.strip():
-        chunks.append(current_chunk.strip())
+        chunks.append({"content": current_chunk.strip(), "filename": filename})
     
     # Filter out very short chunks
-    chunks = [chunk for chunk in chunks if len(chunk) > 100]
+    chunks = [chunk for chunk in chunks if len(chunk["content"]) > 100]
     
     print(f"Created {len(chunks)} chunks from {len(text)} characters")
     return chunks
@@ -344,7 +344,7 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
                 chunks = create_chunks(content, file.filename)
                 print(f"📄 Processing {file.filename}: {len(chunks)} chunks", flush=True)
                 if chunks:
-                    ai_agent.kb.add_documents(chunks)
+                    ai_agent.kb.add_documents_with_filename(chunks)
                     processed += 1
                 else:
                     print(f"⚠️ No valid chunks found in {file.filename}", flush=True)
@@ -357,25 +357,50 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
 
 @app.get("/admin/knowledge-list")
 async def list_knowledge(token: str = Depends(verify_admin_token)):
-    """List all knowledge base documents (protected)"""
+    """List all knowledge base documents grouped by filename (protected)"""
     if not ai_agent.kb.supabase:
         return []
     
     try:
-        result = ai_agent.kb.supabase.table('knowledge_embeddings').select('id, content').execute()
-        return result.data
+        result = ai_agent.kb.supabase.table('knowledge_embeddings').select('filename').execute()
+        
+        # Group by filename and count chunks
+        files = {}
+        for row in result.data:
+            filename = row.get('filename', 'Unknown')
+            if filename in files:
+                files[filename] += 1
+            else:
+                files[filename] = 1
+        
+        # Convert to list format
+        file_list = [{'filename': name, 'chunks': count} for name, count in files.items()]
+        return sorted(file_list, key=lambda x: x['filename'])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/admin/knowledge/{doc_id}")
-async def delete_knowledge(doc_id: int, token: str = Depends(verify_admin_token)):
-    """Delete a knowledge document (protected)"""
+@app.delete("/admin/knowledge/{filename}")
+async def delete_knowledge_file(filename: str, token: str = Depends(verify_admin_token)):
+    """Delete all chunks of a PDF file (protected)"""
     if not ai_agent.kb.supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
     try:
-        ai_agent.kb.supabase.table('knowledge_embeddings').delete().eq('id', doc_id).execute()
-        return {"message": "Document deleted"}
+        result = ai_agent.kb.supabase.table('knowledge_embeddings').delete().eq('filename', filename).execute()
+        deleted_count = len(result.data) if result.data else 0
+        return {"message": f"Deleted {deleted_count} chunks from {filename}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/knowledge/{filename}/chunks")
+async def get_file_chunks(filename: str, token: str = Depends(verify_admin_token)):
+    """Get all chunks for a specific file (protected)"""
+    if not ai_agent.kb.supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    
+    try:
+        result = ai_agent.kb.supabase.table('knowledge_embeddings').select('id, content').eq('filename', filename).execute()
+        return result.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
