@@ -18,6 +18,9 @@
 </head>
 <body>
     <h1>🧠 Knowledge Base Management</h1>
+    <div style="text-align: right; margin-bottom: 20px;">
+        <button class="btn" onclick="logout()" style="background: #dc3545;">🚪 Logout</button>
+    </div>
     
     <div class="upload-area" onclick="document.getElementById('fileInput').click()">
         <p>📁 Click to upload PDF files or drag & drop here</p>
@@ -41,6 +44,15 @@
             setTimeout(() => status.innerHTML = '', 5000);
         }
 
+        function getAuthHeaders() {
+            const token = localStorage.getItem('admin_token');
+            if (!token) {
+                window.location.href = '/admin/login';
+                return null;
+            }
+            return {'Authorization': `Bearer ${token}`};
+        }
+
         async function uploadFiles() {
             const fileInput = document.getElementById('fileInput');
             const files = fileInput.files;
@@ -56,10 +68,20 @@
             }
 
             try {
+                const headers = getAuthHeaders();
+                if (!headers) return;
+
                 const response = await fetch('/admin/upload-knowledge', {
                     method: 'POST',
+                    headers: headers,
                     body: formData
                 });
+                
+                if (response.status === 401) {
+                    localStorage.removeItem('admin_token');
+                    window.location.href = '/admin/login';
+                    return;
+                }
                 
                 const result = await response.json();
                 
@@ -77,7 +99,17 @@
 
         async function loadDocuments() {
             try {
-                const response = await fetch('/admin/knowledge-list');
+                const headers = getAuthHeaders();
+                if (!headers) return;
+
+                const response = await fetch('/admin/knowledge-list', {headers});
+                
+                if (response.status === 401) {
+                    localStorage.removeItem('admin_token');
+                    window.location.href = '/admin/login';
+                    return;
+                }
+                
                 const docs = await response.json();
                 
                 const list = document.getElementById('documentsList');
@@ -102,7 +134,19 @@
             if (!confirm('Delete this document?')) return;
             
             try {
-                const response = await fetch(`/admin/knowledge/${id}`, { method: 'DELETE' });
+                const headers = getAuthHeaders();
+                if (!headers) return;
+
+                const response = await fetch(`/admin/knowledge/${id}`, { 
+                    method: 'DELETE',
+                    headers: headers
+                });
+                
+                if (response.status === 401) {
+                    localStorage.removeItem('admin_token');
+                    window.location.href = '/admin/login';
+                    return;
+                }
                 
                 if (response.ok) {
                     showStatus('✅ Document deleted');
@@ -115,8 +159,17 @@
             }
         }
 
-        // Load documents on page load
-        loadDocuments();
+        function logout() {
+            localStorage.removeItem('admin_token');
+            window.location.href = '/admin/login';
+        }
+
+        // Check authentication on page load
+        if (!localStorage.getItem('admin_token')) {
+            window.location.href = '/admin/login';
+        } else {
+            loadDocuments();
+        }
     </script>
 </body>
 </html>

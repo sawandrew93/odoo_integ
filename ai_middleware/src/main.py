@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional, List
 import os
@@ -8,6 +8,8 @@ import json
 from dotenv import load_dotenv
 import PyPDF2
 import io
+import secrets
+import hashlib
 
 from .odoo_client import OdooClient
 from .ai_agent import AIAgent
@@ -63,6 +65,13 @@ class ChatResponse(BaseModel):
     handoff_needed: bool
     confidence: float
     odoo_session_id: Optional[int] = None
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+# Simple token storage (in production, use Redis or database)
+valid_tokens = set()
 
 @app.post("/chat", response_model=ChatResponse)
 async def handle_chat(chat_message: ChatMessage):
@@ -212,16 +221,59 @@ async def get_connections():
         "monitoring_tasks": len(ws_manager.tasks)
     }
 
+def verify_admin_token(authorization: str = Header(None)):
+    """Verify admin authentication token"""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    
+    try:
+        token = authorization.replace('Bearer ', '')
+        if token not in valid_tokens:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return token
+    except:
+        raise HTTPException(status_code=401, detail="Invalid authorization format")
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page():
+    """Admin login page"""
+    template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'admin_login.html')
+    with open(template_path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+@app.post("/admin/login")
+async def admin_login(login_data: LoginRequest):
+    """Admin login endpoint"""
+    admin_username = os.getenv('ADMIN_USERNAME', 'admin')
+    admin_password = os.getenv('ADMIN_PASSWORD', 'admin123')
+    
+    # Hash the provided password for comparison
+    provided_hash = hashlib.sha256(login_data.password.encode()).hexdigest()
+    expected_hash = hashlib.sha256(admin_password.encode()).hexdigest()
+    
+    if login_data.username == admin_username and provided_hash == expected_hash:
+        # Generate secure token
+        token = secrets.token_urlsafe(32)
+        valid_tokens.add(token)
+        return {"token": token, "message": "Login successful"}
+    else:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_panel():
-    """Knowledge base admin panel"""
+async def admin_panel(token: str = Depends(verify_admin_token)):
+    """Knowledge base admin panel (protected)"""
     template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'knowledge_upload.html')
     with open(template_path, 'r', encoding='utf-8') as f:
         return f.read()
 
+@app.get("/admin/")
+async def admin_redirect():
+    """Redirect /admin/ to login"""
+    return RedirectResponse(url="/admin/login")
+
 @app.post("/admin/upload-knowledge")
-async def upload_knowledge(files: List[UploadFile] = File(...)):
-    """Upload and process knowledge files"""
+async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Depends(verify_admin_token)):
+    """Upload and process knowledge files (protected)"""
     processed = 0
     
     for file in files:
@@ -253,8 +305,8 @@ async def upload_knowledge(files: List[UploadFile] = File(...)):
     return {"processed": processed, "message": f"Successfully processed {processed} files"}
 
 @app.get("/admin/knowledge-list")
-async def list_knowledge():
-    """List all knowledge base documents"""
+async def list_knowledge(token: str = Depends(verify_admin_token)):
+    """List all knowledge base documents (protected)"""
     if not ai_agent.kb.supabase:
         return []
     
@@ -265,8 +317,8 @@ async def list_knowledge():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/admin/knowledge/{doc_id}")
-async def delete_knowledge(doc_id: int):
-    """Delete a knowledge document"""
+async def delete_knowledge(doc_id: int, token: str = Depends(verify_admin_token)):
+    """Delete a knowledge document (protected)"""
     if not ai_agent.kb.supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
