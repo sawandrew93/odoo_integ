@@ -37,17 +37,25 @@ odoo_client = OdooClient(
     password=os.getenv('ODOO_PASSWORD')
 )
 
-ai_agent = AIAgent(
-    api_key=os.getenv('GEMINI_API_KEY'),
-    confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', 0.7)),
-    supabase_url=os.getenv('SUPABASE_URL'),
-    supabase_key=os.getenv('SUPABASE_KEY')
-)
+# Initialize AI agent with error handling
+try:
+    ai_agent = AIAgent(
+        api_key=os.getenv('GEMINI_API_KEY'),
+        confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', 0.7)),
+        supabase_url=os.getenv('SUPABASE_URL'),
+        supabase_key=os.getenv('SUPABASE_KEY')
+    )
+except Exception as e:
+    print(f"Warning: AI Agent initialization failed: {e}")
+    ai_agent = None
 
 # Load knowledge base on startup
 knowledge_dir = os.path.join(os.path.dirname(__file__), '..', 'knowledge')
-if os.path.exists(knowledge_dir):
-    ai_agent.load_knowledge_base(knowledge_dir)
+if ai_agent and os.path.exists(knowledge_dir):
+    try:
+        ai_agent.load_knowledge_base(knowledge_dir)
+    except Exception as e:
+        print(f"Warning: Failed to load knowledge base: {e}")
 
 # Initialize WebSocket manager
 ws_manager = WebSocketManager(odoo_client)
@@ -142,11 +150,17 @@ async def handle_chat(chat_message: ChatMessage):
                 )
         
         # Process message with AI agent
-        handoff_needed, ai_response, confidence = ai_agent.should_handoff(
-            chat_message.message, 
-            chat_message.context,
-            chat_message.session_id
-        )
+        if not ai_agent:
+            # Fallback if AI agent not initialized
+            handoff_needed = True
+            ai_response = "AI service temporarily unavailable. Connecting you with support."
+            confidence = 0.0
+        else:
+            handoff_needed, ai_response, confidence = ai_agent.should_handoff(
+                chat_message.message, 
+                chat_message.context,
+                chat_message.session_id
+            )
         
         odoo_session_id = None
         
@@ -315,6 +329,9 @@ async def admin_redirect():
 @app.post("/admin/upload-knowledge")
 async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Depends(verify_admin_token)):
     """Upload and process knowledge files (protected)"""
+    if not ai_agent or not ai_agent.kb or not ai_agent.kb.supabase:
+        raise HTTPException(status_code=500, detail="Knowledge base not properly configured. Please check Supabase credentials.")
+    
     processed = 0
     
     for file in files:
@@ -358,8 +375,8 @@ async def upload_knowledge(files: List[UploadFile] = File(...), token: str = Dep
 @app.get("/admin/knowledge-list")
 async def list_knowledge(token: str = Depends(verify_admin_token)):
     """List all knowledge base documents grouped by filename (protected)"""
-    if not ai_agent.kb.supabase:
-        return []
+    if not ai_agent or not ai_agent.kb or not ai_agent.kb.supabase:
+        raise HTTPException(status_code=500, detail="Knowledge base not properly configured. Please check Supabase credentials.")
     
     try:
         result = ai_agent.kb.supabase.table('knowledge_embeddings').select('filename').execute()
@@ -382,8 +399,8 @@ async def list_knowledge(token: str = Depends(verify_admin_token)):
 @app.delete("/admin/knowledge/{filename}")
 async def delete_knowledge_file(filename: str, token: str = Depends(verify_admin_token)):
     """Delete all chunks of a PDF file (protected)"""
-    if not ai_agent.kb.supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+    if not ai_agent or not ai_agent.kb or not ai_agent.kb.supabase:
+        raise HTTPException(status_code=500, detail="Knowledge base not properly configured. Please check Supabase credentials.")
     
     try:
         result = ai_agent.kb.supabase.table('knowledge_embeddings').delete().eq('filename', filename).execute()
@@ -395,8 +412,8 @@ async def delete_knowledge_file(filename: str, token: str = Depends(verify_admin
 @app.get("/admin/knowledge/{filename}/chunks")
 async def get_file_chunks(filename: str, token: str = Depends(verify_admin_token)):
     """Get all chunks for a specific file (protected)"""
-    if not ai_agent.kb.supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+    if not ai_agent or not ai_agent.kb or not ai_agent.kb.supabase:
+        raise HTTPException(status_code=500, detail="Knowledge base not properly configured. Please check Supabase credentials.")
     
     try:
         result = ai_agent.kb.supabase.table('knowledge_embeddings').select('id, content').eq('filename', filename).execute()
