@@ -1,10 +1,17 @@
 #!/bin/bash
 
 # HTTPS Setup with Let's Encrypt for AI Middleware
-# Run this script on your Ubuntu server
+# Usage: ./setup_https.sh <domain> <email>
 
-DOMAIN="your-domain.com"  # Change this to your domain
-EMAIL="your-email@example.com"  # Change this to your email
+if [ $# -ne 2 ]; then
+    echo "❌ Error: Missing required parameters"
+    echo "Usage: $0 <domain> <email>"
+    echo "Example: $0 odoo.andrewdemo.online admin@example.com"
+    exit 1
+fi
+
+DOMAIN="$1"
+EMAIL="$2"
 
 echo "🚀 Setting up HTTPS with Let's Encrypt for $DOMAIN"
 
@@ -19,7 +26,7 @@ server {
     server_name $DOMAIN;
 
     location / {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -30,9 +37,18 @@ server {
         proxy_cache_bypass \$http_upgrade;
     }
 
+    # Admin panel for knowledge base management
+    location /admin {
+        proxy_pass http://127.0.0.1:8000/admin;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
     # WebSocket support
     location /ws/ {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
