@@ -165,13 +165,8 @@ async def handle_chat(chat_message: ChatMessage):
         odoo_session_id = None
         
         if handoff_needed:
-            # Get conversation history and create Odoo live chat session
-            conversation_history = ai_agent.get_conversation_history(chat_message.session_id)
-            if conversation_history:
-                formatted_history = "\n".join([f"• {line}" for line in conversation_history.split("\n")])
-                full_message = f"📋 Previous Conversation:\n{formatted_history}\n\n🔹 Current Request: {chat_message.message}"
-            else:
-                full_message = chat_message.message
+            # Send only the current request to keep it clean and readable
+            full_message = f"🔹 Customer Request: {chat_message.message}\n\n💡 Note: Customer was transferred from AI chat. Previous conversation history is available in the AI system if needed."
             
             odoo_session_id = odoo_client.create_live_chat_session(
                 visitor_name=chat_message.visitor_name,
