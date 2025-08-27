@@ -61,6 +61,10 @@
                 sessionEnded = true;
                 document.getElementById('message-input').disabled = true;
                 document.getElementById('send-btn').disabled = true;
+                // Show feedback survey after 2 seconds
+                setTimeout(() => showFeedbackSurvey(), 2000);
+            } else if (data.type === 'show_feedback') {
+                showFeedbackSurvey();
             }
         };
     }
@@ -160,6 +164,55 @@
     const widget = createWidget();
     addMessage('Hello! How can I help you today?');
     
+    function showFeedbackSurvey() {
+        const messagesDiv = document.getElementById('chat-messages');
+        const surveyDiv = document.createElement('div');
+        surveyDiv.innerHTML = `
+            <div style="background: white; padding: 20px; border-radius: 12px; margin: 15px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #e0e0e0; text-align: center;">
+                <div style="margin-bottom: 15px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #333;">Rate this conversation</h3>
+                    <p style="margin: 0; font-size: 14px; color: #666;">How would you rate the quality of this conversation?</p>
+                </div>
+                <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 15px;">
+                    <button onclick="submitFeedback('satisfied')" style="padding: 12px 20px; background: #00a65a; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                        Satisfied
+                    </button>
+                    <button onclick="submitFeedback('not_satisfied')" style="padding: 12px 20px; background: #dd4b39; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                        Not satisfied
+                    </button>
+                </div>
+                <button onclick="closeSurvey()" style="padding: 6px 12px; background: transparent; color: #666; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 12px;">Skip</button>
+            </div>
+        `;
+        messagesDiv.appendChild(surveyDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    window.submitFeedback = async function(rating) {
+        try {
+            await fetch(`${CONFIG.API_BASE}/feedback`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    rating: rating,
+                    comment: ''
+                })
+            });
+            addMessage('Thank you for your feedback!', false, true);
+        } catch (error) {
+            addMessage('Thank you for your feedback!', false, true);
+        }
+        closeSurvey();
+    }
+
+    window.closeSurvey = function() {
+        const survey = document.querySelector('#chat-messages div[style*="background: white"]');
+        if (survey && survey.innerHTML.includes('Rate this conversation')) {
+            survey.remove();
+        }
+    }
+
     document.getElementById('send-btn').onclick = sendMessage;
     document.getElementById('message-input').onkeypress = (e) => {
         if (e.key === 'Enter') sendMessage();
