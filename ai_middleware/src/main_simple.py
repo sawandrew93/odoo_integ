@@ -370,6 +370,15 @@ async def get_file_chunks(filename: str, token: str = Depends(verify_admin_token
         print(f"Error getting chunks: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/widget.js")
+async def serve_widget():
+    """Serve the chat widget JavaScript file"""
+    widget_path = os.path.join(os.path.dirname(__file__), '..', 'widget.js')
+    if os.path.exists(widget_path):
+        return FileResponse(widget_path, media_type="application/javascript")
+    else:
+        raise HTTPException(status_code=404, detail="Widget file not found")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
