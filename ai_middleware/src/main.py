@@ -282,6 +282,10 @@ async def get_connections():
 async def download_attachment(attachment_id: int):
     """Proxy endpoint for downloading attachments with authentication"""
     try:
+        # Ensure authentication
+        if not odoo_client.uid:
+            odoo_client.authenticate()
+        
         response = odoo_client.session.get(f"{odoo_client.url}/web/content/{attachment_id}?download=true")
         if response.status_code == 200:
             from fastapi.responses import Response

@@ -266,7 +266,7 @@ class OdooClient:
                             ["model", "=", "discuss.channel"],
                             ["id", ">", last_message_id],
                             ["author_id", "!=", False]
-                        ], ["id", "body", "author_id", "date", "email_from", "attachment_ids"]],
+                        ], ["id", "body", "author_id", "date", "email_from", "attachment_ids", "message_type", "subtype_id"]],
                         "kwargs": {"order": "date asc", "limit": 5}
                     },
                     "id": 6
@@ -292,6 +292,17 @@ class OdooClient:
                                     attachments = self._get_attachments_sync(msg['attachment_ids'])
                                     print(f"Fetched {len(attachments)} attachments: {[att['name'] for att in attachments]}")
                                 
+                                # Detect message type
+                                message_type = 'text'
+                                if attachments:
+                                    for att in attachments:
+                                        if att['mimetype'].startswith('audio/'):
+                                            message_type = 'voice'
+                                            break
+                                        elif att['mimetype'].startswith('image/') and 'gif' in att['mimetype']:
+                                            message_type = 'gif'
+                                            break
+                                
                                 await callback({
                                     'type': 'message',
                                     'data': {
@@ -299,7 +310,8 @@ class OdooClient:
                                         'body': clean_body,
                                         'author': author_name,
                                         'date': msg['date'],
-                                        'attachments': attachments
+                                        'attachments': attachments,
+                                        'message_type': message_type
                                     }
                                 })
                                 

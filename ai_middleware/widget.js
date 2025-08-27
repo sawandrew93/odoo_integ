@@ -54,40 +54,70 @@
             attachmentsDiv.style.cssText = 'margin-top:8px;';
             
             attachments.forEach(attachment => {
-                const attachmentDiv = document.createElement('div');
-                attachmentDiv.className = 'attachment-item';
-                attachmentDiv.style.cssText = `
-                    display:flex;
-                    align-items:center;
-                    gap:8px;
-                    padding:8px;
-                    margin:4px 0;
-                    background:rgba(255,255,255,0.1);
-                    border-radius:8px;
-                    border:1px solid rgba(255,255,255,0.2);
-                `;
-                
-                // File icon based on type
-                const icon = getFileIcon(attachment.mimetype);
-                
-                attachmentDiv.innerHTML = `
-                    <span style="font-size:16px;">${icon}</span>
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-weight:600;color:${isUser ? 'white' : '#333'};font-size:13px;">${attachment.name}</div>
-                        <div style="font-size:11px;color:${isUser ? 'rgba(255,255,255,0.8)' : '#666'};">${formatFileSize(attachment.size)}</div>
-                    </div>
-                    <a href="${attachment.download_url}" target="_blank" class="attachment-link" style="
-                        padding:4px 8px;
-                        background:${isUser ? 'rgba(255,255,255,0.2)' : '#667eea'};
-                        color:${isUser ? 'white' : 'white'};
-                        text-decoration:none;
-                        border-radius:4px;
-                        font-size:11px;
-                        font-weight:600;
-                    ">Download</a>
-                `;
-                
-                attachmentsDiv.appendChild(attachmentDiv);
+                // Handle different media types
+                if (attachment.mimetype.startsWith('image/')) {
+                    const imgDiv = document.createElement('div');
+                    imgDiv.style.cssText = 'margin:4px 0;';
+                    imgDiv.innerHTML = `
+                        <img src="${attachment.download_url}" alt="${attachment.name}" style="
+                            max-width:200px;
+                            max-height:200px;
+                            border-radius:8px;
+                            cursor:pointer;
+                        " onclick="window.open('${attachment.download_url}', '_blank')">
+                    `;
+                    attachmentsDiv.appendChild(imgDiv);
+                } else if (attachment.mimetype.startsWith('audio/')) {
+                    const audioDiv = document.createElement('div');
+                    audioDiv.style.cssText = 'margin:4px 0;';
+                    audioDiv.innerHTML = `
+                        <div style="display:flex;align-items:center;gap:8px;padding:8px;background:rgba(255,255,255,0.1);border-radius:8px;">
+                            <span style="font-size:16px;">🎵</span>
+                            <div style="flex:1;">
+                                <div style="font-weight:600;color:${isUser ? 'white' : '#333'};font-size:13px;">Voice Message</div>
+                                <audio controls style="width:100%;height:30px;">
+                                    <source src="${attachment.download_url}" type="${attachment.mimetype}">
+                                </audio>
+                            </div>
+                        </div>
+                    `;
+                    attachmentsDiv.appendChild(audioDiv);
+                } else {
+                    // Regular file attachment
+                    const attachmentDiv = document.createElement('div');
+                    attachmentDiv.className = 'attachment-item';
+                    attachmentDiv.style.cssText = `
+                        display:flex;
+                        align-items:center;
+                        gap:8px;
+                        padding:8px;
+                        margin:4px 0;
+                        background:rgba(255,255,255,0.1);
+                        border-radius:8px;
+                        border:1px solid rgba(255,255,255,0.2);
+                    `;
+                    
+                    const icon = getFileIcon(attachment.mimetype);
+                    
+                    attachmentDiv.innerHTML = `
+                        <span style="font-size:16px;">${icon}</span>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:600;color:${isUser ? 'white' : '#333'};font-size:13px;">${attachment.name}</div>
+                            <div style="font-size:11px;color:${isUser ? 'rgba(255,255,255,0.8)' : '#666'};">${formatFileSize(attachment.size)}</div>
+                        </div>
+                        <a href="${attachment.download_url}" target="_blank" class="attachment-link" style="
+                            padding:4px 8px;
+                            background:${isUser ? 'rgba(255,255,255,0.2)' : '#667eea'};
+                            color:${isUser ? 'white' : 'white'};
+                            text-decoration:none;
+                            border-radius:4px;
+                            font-size:11px;
+                            font-weight:600;
+                        ">Download</a>
+                    `;
+                    
+                    attachmentsDiv.appendChild(attachmentDiv);
+                }
             });
             
             messageDiv.appendChild(attachmentsDiv);
