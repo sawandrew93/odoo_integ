@@ -52,6 +52,8 @@
         
         websocket.onmessage = (event) => {
             const data = JSON.parse(event.data);
+            console.log('WebSocket message received:', data);
+            
             if (data.type === 'message') {
                 addMessage(`${data.data.author}: ${data.data.body}`);
             } else if (data.type === 'agent_joined') {
@@ -62,8 +64,13 @@
                 document.getElementById('message-input').disabled = true;
                 document.getElementById('send-btn').disabled = true;
                 // Show feedback survey after 2 seconds
-                setTimeout(() => showFeedbackSurvey(), 2000);
+                console.log('Session ended, showing feedback in 2 seconds');
+                setTimeout(() => {
+                    console.log('Showing feedback survey now');
+                    showFeedbackSurvey();
+                }, 2000);
             } else if (data.type === 'show_feedback') {
+                console.log('Show feedback message received');
                 showFeedbackSurvey();
             }
         };
