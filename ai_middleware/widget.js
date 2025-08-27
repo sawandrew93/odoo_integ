@@ -158,7 +158,19 @@
             
             if (data.type === 'message') {
                 console.log('Message attachments:', data.data.attachments);
-                const messageText = data.data.body ? `${data.data.author}: ${data.data.body}` : (data.data.attachments && data.data.attachments.length > 0 ? `${data.data.author} sent ${data.data.attachments.length} file(s)` : `${data.data.author}:`);
+                let messageText = data.data.body ? `${data.data.author}: ${data.data.body}` : `${data.data.author}:`;
+                
+                if (!data.data.body && data.data.attachments && data.data.attachments.length > 0) {
+                    const att = data.data.attachments[0];
+                    if (att.mimetype.startsWith('audio/')) {
+                        messageText = `${data.data.author} sent a voice message`;
+                    } else if (att.mimetype.startsWith('image/')) {
+                        messageText = `${data.data.author} sent an image`;
+                    } else {
+                        messageText = `${data.data.author} sent ${data.data.attachments.length} file(s)`;
+                    }
+                }
+                
                 addMessage(messageText, false, false, data.data.attachments || []);
             } else if (data.type === 'agent_joined') {
                 addMessage(data.message, false, true);
