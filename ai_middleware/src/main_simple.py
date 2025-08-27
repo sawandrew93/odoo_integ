@@ -432,6 +432,28 @@ async def serve_widget():
     else:
         raise HTTPException(status_code=404, detail="Widget file not found")
 
+@app.get("/download/{attachment_id}")
+async def download_attachment(attachment_id: int):
+    """Proxy endpoint for downloading attachments with authentication"""
+    try:
+        if not odoo_client.uid:
+            odoo_client.authenticate()
+        
+        response = odoo_client.session.get(f"{odoo_client.url}/web/content/{attachment_id}?download=true")
+        if response.status_code == 200:
+            from fastapi.responses import Response
+            return Response(
+                content=response.content,
+                media_type=response.headers.get('content-type', 'application/octet-stream'),
+                headers={
+                    'Content-Disposition': response.headers.get('content-disposition', f'attachment; filename="file_{attachment_id}"')
+                }
+            )
+        else:
+            raise HTTPException(status_code=404, detail="File not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Download error: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
