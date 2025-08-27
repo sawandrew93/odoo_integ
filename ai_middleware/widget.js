@@ -246,6 +246,17 @@
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
+    // Debug function to check state and force feedback
+    window.debugWidget = function() {
+        console.log('sessionId:', sessionId);
+        console.log('sessionEnded:', sessionEnded);
+        console.log('isMinimized:', isMinimized);
+        
+        // Force show feedback
+        console.log('Forcing feedback survey...');
+        showFeedbackSurvey();
+    };
+
     window.submitFeedback = async function(rating) {
         try {
             await fetch(`${CONFIG.API_BASE}/feedback`, {
