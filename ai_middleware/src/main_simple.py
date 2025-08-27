@@ -391,7 +391,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
 
 class FeedbackRequest(BaseModel):
     session_id: int
-    rating: str
+    rating: int  # 1-5 stars
     comment: Optional[str] = ""
 
 @app.post("/feedback")

@@ -179,6 +179,11 @@
                 sessionEnded = true;
                 document.getElementById('message-input').disabled = true;
                 document.getElementById('send-btn').disabled = true;
+                
+                // Show feedback survey after 2 seconds
+                setTimeout(() => {
+                    showFeedbackSurvey();
+                }, 2000);
             }
         };
     }
@@ -282,6 +287,88 @@
     addMessage('Hello! How can I help you today?');
     
 
+
+    function showFeedbackSurvey() {
+        // Auto-maximize widget to show survey
+        if (isMinimized) {
+            toggleMinimize();
+        }
+        
+        const messagesDiv = document.getElementById('chat-messages');
+        if (!messagesDiv) return;
+        
+        const surveyDiv = document.createElement('div');
+        surveyDiv.style.cssText = 'background: white; padding: 20px; border-radius: 12px; margin: 15px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #e0e0e0; text-align: center;';
+        
+        surveyDiv.innerHTML = `
+            <div style="margin-bottom: 15px;">
+                <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #333;">Rate this conversation</h3>
+                <p style="margin: 0; font-size: 14px; color: #666;">How would you rate the quality of this conversation?</p>
+            </div>
+            <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;">
+                <span onclick="selectRating(1)" style="font-size: 24px; cursor: pointer; color: #ddd;" data-rating="1">⭐</span>
+                <span onclick="selectRating(2)" style="font-size: 24px; cursor: pointer; color: #ddd;" data-rating="2">⭐</span>
+                <span onclick="selectRating(3)" style="font-size: 24px; cursor: pointer; color: #ddd;" data-rating="3">⭐</span>
+                <span onclick="selectRating(4)" style="font-size: 24px; cursor: pointer; color: #ddd;" data-rating="4">⭐</span>
+                <span onclick="selectRating(5)" style="font-size: 24px; cursor: pointer; color: #ddd;" data-rating="5">⭐</span>
+            </div>
+            <textarea id="feedback-comment" placeholder="Optional comment..." style="width: 100%; height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 6px; resize: none; font-family: inherit; margin-bottom: 15px;"></textarea>
+            <div style="display: flex; justify-content: center; gap: 10px;">
+                <button onclick="submitFeedback()" style="padding: 10px 20px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                    Submit
+                </button>
+                <button onclick="closeSurvey()" style="padding: 10px 20px; background: transparent; color: #666; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                    Skip
+                </button>
+            </div>
+        `;
+        
+        messagesDiv.appendChild(surveyDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    let selectedRating = 0;
+
+    window.selectRating = function(rating) {
+        selectedRating = rating;
+        const stars = document.querySelectorAll('[data-rating]');
+        stars.forEach((star, index) => {
+            star.style.color = index < rating ? '#ffd700' : '#ddd';
+        });
+    }
+
+    window.submitFeedback = async function() {
+        if (selectedRating === 0) {
+            alert('Please select a rating');
+            return;
+        }
+        
+        const comment = document.getElementById('feedback-comment')?.value || '';
+        
+        try {
+            await fetch(`${CONFIG.API_BASE}/feedback`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    rating: selectedRating,
+                    comment: comment
+                })
+            });
+            addMessage('Thank you for your feedback!', false, true);
+        } catch (error) {
+            addMessage('Thank you for your feedback!', false, true);
+        }
+        closeSurvey();
+    }
+
+    window.closeSurvey = function() {
+        const survey = document.querySelector('#chat-messages div[style*="background: white"]');
+        if (survey && survey.innerHTML.includes('Rate this conversation')) {
+            survey.remove();
+        }
+        selectedRating = 0;
+    }
 
     document.getElementById('send-btn').onclick = sendMessage;
     document.getElementById('message-input').onkeypress = (e) => {
