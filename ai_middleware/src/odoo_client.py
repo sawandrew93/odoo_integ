@@ -265,7 +265,7 @@ class OdooClient:
                             ["model", "=", "discuss.channel"],
                             ["id", ">", last_message_id],
                             ["author_id", "!=", False]
-                        ], ["id", "body", "author_id", "date", "email_from"]],
+                        ], ["id", "body", "author_id", "date", "email_from", "attachment_ids"]],
                         "kwargs": {"order": "date asc", "limit": 5}
                     },
                     "id": 6
@@ -284,13 +284,21 @@ class OdooClient:
                                 clean_body = re.sub(r'<[^>]+>', '', msg['body'])
                                 author_name = msg['author_id'][1] if isinstance(msg['author_id'], list) else 'Agent'
                                 
+                                # Handle attachments
+                                attachments = []
+                                if msg.get('attachment_ids'):
+                                    print(f"Found attachment_ids: {msg['attachment_ids']}")
+                                    attachments = self._get_attachments_sync(msg['attachment_ids'])
+                                    print(f"Fetched {len(attachments)} attachments: {[att['name'] for att in attachments]}")
+                                
                                 await callback({
                                     'type': 'message',
                                     'data': {
                                         'id': msg['id'],
                                         'body': clean_body,
                                         'author': author_name,
-                                        'date': msg['date']
+                                        'date': msg['date'],
+                                        'attachments': attachments
                                     }
                                 })
                                 
@@ -302,6 +310,48 @@ class OdooClient:
                 print(f"❌ Message check error for session {session_id}: {e}")
                 await asyncio.sleep(3)
                 continue
+    
+    def _get_attachments_sync(self, attachment_ids):
+        """Fetch attachment details from Odoo (synchronous version)"""
+        if not attachment_ids:
+            return []
+        
+        try:
+            attachment_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "ir.attachment",
+                    "method": "read",
+                    "args": [attachment_ids, ["id", "name", "mimetype", "file_size", "datas"]],
+                    "kwargs": {}
+                },
+                "id": 10
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=attachment_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    attachments = []
+                    for att in result['result']:
+                        # Create download URL for the attachment
+                        download_url = f"{self.url}/web/content/{att['id']}?download=true"
+                        attachments.append({
+                            'id': att['id'],
+                            'name': att['name'],
+                            'mimetype': att.get('mimetype', 'application/octet-stream'),
+                            'size': att.get('file_size', 0),
+                            'download_url': download_url
+                        })
+                    return attachments
+        except Exception as e:
+            print(f"Error fetching attachments: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        return []
     
     def store_feedback(self, session_id: int, rating: str, comment: str = "") -> bool:
         """Store feedback for a chat session in Odoo"""

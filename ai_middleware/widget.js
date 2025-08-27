@@ -32,7 +32,7 @@
         return widget;
     }
 
-    function addMessage(content, isUser = false, isSystem = false) {
+    function addMessage(content, isUser = false, isSystem = false, attachments = []) {
         const messagesDiv = document.getElementById('chat-messages');
         const messageDiv = document.createElement('div');
         messageDiv.style.cssText = `margin:8px 0;padding:12px 16px;border-radius:18px;max-width:80%;word-wrap:break-word;font-size:14px;line-height:1.4;${
@@ -40,9 +40,81 @@
             isSystem ? 'background:#e8f5e8;font-style:italic;text-align:center;color:#666;margin:0 auto;' :
             'background:#f1f3f4;color:#333;margin-right:auto;'
         }`;
-        messageDiv.textContent = content;
+        
+        // Add text content
+        if (content) {
+            const textDiv = document.createElement('div');
+            textDiv.textContent = content;
+            messageDiv.appendChild(textDiv);
+        }
+        
+        // Add attachments if any
+        if (attachments && attachments.length > 0) {
+            const attachmentsDiv = document.createElement('div');
+            attachmentsDiv.style.cssText = 'margin-top:8px;';
+            
+            attachments.forEach(attachment => {
+                const attachmentDiv = document.createElement('div');
+                attachmentDiv.className = 'attachment-item';
+                attachmentDiv.style.cssText = `
+                    display:flex;
+                    align-items:center;
+                    gap:8px;
+                    padding:8px;
+                    margin:4px 0;
+                    background:rgba(255,255,255,0.1);
+                    border-radius:8px;
+                    border:1px solid rgba(255,255,255,0.2);
+                `;
+                
+                // File icon based on type
+                const icon = getFileIcon(attachment.mimetype);
+                
+                attachmentDiv.innerHTML = `
+                    <span style="font-size:16px;">${icon}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;color:${isUser ? 'white' : '#333'};font-size:13px;">${attachment.name}</div>
+                        <div style="font-size:11px;color:${isUser ? 'rgba(255,255,255,0.8)' : '#666'};">${formatFileSize(attachment.size)}</div>
+                    </div>
+                    <a href="${attachment.download_url}" target="_blank" class="attachment-link" style="
+                        padding:4px 8px;
+                        background:${isUser ? 'rgba(255,255,255,0.2)' : '#667eea'};
+                        color:${isUser ? 'white' : 'white'};
+                        text-decoration:none;
+                        border-radius:4px;
+                        font-size:11px;
+                        font-weight:600;
+                    ">Download</a>
+                `;
+                
+                attachmentsDiv.appendChild(attachmentDiv);
+            });
+            
+            messageDiv.appendChild(attachmentsDiv);
+        }
+        
         messagesDiv.appendChild(messageDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    function getFileIcon(mimetype) {
+        if (mimetype.startsWith('image/')) return '🖼️';
+        if (mimetype.startsWith('video/')) return '🎥';
+        if (mimetype.startsWith('audio/')) return '🎵';
+        if (mimetype.includes('pdf')) return '📄';
+        if (mimetype.includes('word') || mimetype.includes('document')) return '📝';
+        if (mimetype.includes('excel') || mimetype.includes('spreadsheet')) return '📊';
+        if (mimetype.includes('powerpoint') || mimetype.includes('presentation')) return '📋';
+        if (mimetype.includes('zip') || mimetype.includes('rar') || mimetype.includes('archive')) return '📦';
+        return '📎';
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 
     function connectWebSocket() {
@@ -52,8 +124,12 @@
         
         websocket.onmessage = (event) => {
             const data = JSON.parse(event.data);
+            console.log('WebSocket message received:', data);
+            
             if (data.type === 'message') {
-                addMessage(`${data.data.author}: ${data.data.body}`);
+                console.log('Message attachments:', data.data.attachments);
+                const messageText = data.data.body ? `${data.data.author}: ${data.data.body}` : (data.data.attachments && data.data.attachments.length > 0 ? `${data.data.author} sent ${data.data.attachments.length} file(s)` : `${data.data.author}:`);
+                addMessage(messageText, false, false, data.data.attachments || []);
             } else if (data.type === 'agent_joined') {
                 addMessage(data.message, false, true);
             } else if (data.type === 'session_ended') {
@@ -150,6 +226,9 @@
         #chat-messages::-webkit-scrollbar { width: 4px; }
         #chat-messages::-webkit-scrollbar-track { background: #f1f1f1; }
         #chat-messages::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 2px; }
+        .attachment-link:hover { opacity: 0.8 !important; }
+        .attachment-item { transition: background-color 0.2s ease !important; }
+        .attachment-item:hover { background: rgba(255,255,255,0.15) !important; }
         @media (max-width: 480px) {
             #chat-container.maximized { width: calc(100vw - 40px) !important; height: calc(100vh - 40px) !important; bottom: 20px !important; right: 20px !important; left: 20px !important; }
         }
