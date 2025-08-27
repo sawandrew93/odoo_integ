@@ -224,26 +224,34 @@
     function showFeedbackSurvey() {
         console.log('showFeedbackSurvey called');
         const messagesDiv = document.getElementById('chat-messages');
+        if (!messagesDiv) {
+            console.error('chat-messages div not found');
+            return;
+        }
+        
+        // Create survey directly without wrapper div
         const surveyDiv = document.createElement('div');
+        surveyDiv.style.cssText = 'background: white; padding: 20px; border-radius: 12px; margin: 15px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #e0e0e0; text-align: center;';
+        
         surveyDiv.innerHTML = `
-            <div style="background: white; padding: 20px; border-radius: 12px; margin: 15px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #e0e0e0; text-align: center;">
-                <div style="margin-bottom: 15px;">
-                    <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #333;">Rate this conversation</h3>
-                    <p style="margin: 0; font-size: 14px; color: #666;">How would you rate the quality of this conversation?</p>
-                </div>
-                <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 15px;">
-                    <button onclick="submitFeedback('satisfied')" style="padding: 12px 20px; background: #00a65a; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
-                        Satisfied
-                    </button>
-                    <button onclick="submitFeedback('not_satisfied')" style="padding: 12px 20px; background: #dd4b39; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
-                        Not satisfied
-                    </button>
-                </div>
-                <button onclick="closeSurvey()" style="padding: 6px 12px; background: transparent; color: #666; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 12px;">Skip</button>
+            <div style="margin-bottom: 15px;">
+                <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #333;">Rate this conversation</h3>
+                <p style="margin: 0; font-size: 14px; color: #666;">How would you rate the quality of this conversation?</p>
             </div>
+            <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 15px;">
+                <button onclick="submitFeedback('satisfied')" style="padding: 12px 20px; background: #00a65a; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                    Satisfied
+                </button>
+                <button onclick="submitFeedback('not_satisfied')" style="padding: 12px 20px; background: #dd4b39; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                    Not satisfied
+                </button>
+            </div>
+            <button onclick="closeSurvey()" style="padding: 6px 12px; background: transparent; color: #666; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 12px;">Skip</button>
         `;
+        
         messagesDiv.appendChild(surveyDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        console.log('Survey added to DOM');
     }
 
     // Make showFeedbackSurvey globally accessible for testing
