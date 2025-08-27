@@ -103,6 +103,17 @@
                 connectWebSocket();
                 // Start polling session status
                 startSessionStatusPolling();
+            } else if (data.response === 'SESSION_ENDED') {
+                // Session has ended, show agent left message and feedback
+                sessionEnded = true;
+                addMessage('Agent left the channel', false, true);
+                document.getElementById('message-input').disabled = true;
+                document.getElementById('send-btn').disabled = true;
+                
+                // Show feedback survey after 2 seconds
+                setTimeout(() => {
+                    showFeedbackSurvey();
+                }, 2000);
             } else if (data.response) {
                 addMessage(data.response);
             }
