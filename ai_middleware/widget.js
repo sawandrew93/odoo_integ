@@ -52,7 +52,6 @@
         
         websocket.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            console.log('WebSocket message received:', data);
             
             if (data.type === 'message') {
                 addMessage(`${data.data.author}: ${data.data.body}`);
@@ -63,14 +62,8 @@
                 sessionEnded = true;
                 document.getElementById('message-input').disabled = true;
                 document.getElementById('send-btn').disabled = true;
-                // Show feedback survey after 2 seconds
-                console.log('Session ended, showing feedback in 2 seconds');
-                setTimeout(() => {
-                    console.log('Showing feedback survey now');
-                    showFeedbackSurvey();
-                }, 2000);
+                setTimeout(() => showFeedbackSurvey(), 2000);
             } else if (data.type === 'show_feedback') {
-                console.log('Show feedback message received');
                 showFeedbackSurvey();
             }
         };
@@ -222,14 +215,14 @@
     }
 
     function showFeedbackSurvey() {
-        console.log('showFeedbackSurvey called');
-        const messagesDiv = document.getElementById('chat-messages');
-        if (!messagesDiv) {
-            console.error('chat-messages div not found');
-            return;
+        // Auto-maximize widget to show survey
+        if (isMinimized) {
+            toggleMinimize();
         }
         
-        // Create survey directly without wrapper div
+        const messagesDiv = document.getElementById('chat-messages');
+        if (!messagesDiv) return;
+        
         const surveyDiv = document.createElement('div');
         surveyDiv.style.cssText = 'background: white; padding: 20px; border-radius: 12px; margin: 15px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #e0e0e0; text-align: center;';
         
@@ -251,11 +244,7 @@
         
         messagesDiv.appendChild(surveyDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        console.log('Survey added to DOM');
     }
-
-    // Make showFeedbackSurvey globally accessible for testing
-    window.showFeedbackSurvey = showFeedbackSurvey;
 
     window.submitFeedback = async function(rating) {
         try {
