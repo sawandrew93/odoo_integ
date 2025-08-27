@@ -101,6 +101,8 @@
                 sessionId = data.odoo_session_id;
                 addMessage(data.response);
                 connectWebSocket();
+                // Start polling session status
+                startSessionStatusPolling();
             } else if (data.response) {
                 addMessage(data.response);
             }
@@ -171,6 +173,43 @@
     const widget = createWidget();
     addMessage('Hello! How can I help you today?');
     
+    let statusPollingInterval = null;
+    let sessionWasActive = true;
+
+    function startSessionStatusPolling() {
+        if (statusPollingInterval) return; // Already polling
+        
+        statusPollingInterval = setInterval(async () => {
+            if (!sessionId || sessionEnded) {
+                clearInterval(statusPollingInterval);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${CONFIG.API_BASE}/session/${sessionId}/status`);
+                const data = await response.json();
+                
+                // If session was active but now inactive, agent left
+                if (sessionWasActive && !data.active) {
+                    sessionWasActive = false;
+                    sessionEnded = true;
+                    addMessage('Agent left the channel', false, true);
+                    document.getElementById('message-input').disabled = true;
+                    document.getElementById('send-btn').disabled = true;
+                    
+                    // Show feedback survey after 2 seconds
+                    setTimeout(() => {
+                        showFeedbackSurvey();
+                    }, 2000);
+                    
+                    clearInterval(statusPollingInterval);
+                }
+            } catch (error) {
+                console.log('Error checking session status:', error);
+            }
+        }, 5000); // Check every 5 seconds
+    }
+
     function showFeedbackSurvey() {
         const messagesDiv = document.getElementById('chat-messages');
         const surveyDiv = document.createElement('div');

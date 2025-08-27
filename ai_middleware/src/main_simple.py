@@ -413,6 +413,16 @@ async def submit_feedback(feedback: FeedbackRequest):
         print(f"Feedback error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/session/{session_id}/status")
+async def get_session_status(session_id: int):
+    """Check if session is still active"""
+    try:
+        is_active = odoo_client.is_session_active(session_id)
+        return {"active": is_active}
+    except Exception as e:
+        print(f"Error checking session status: {e}")
+        return {"active": False}
+
 @app.get("/widget.js")
 async def serve_widget():
     """Serve the chat widget JavaScript file"""
