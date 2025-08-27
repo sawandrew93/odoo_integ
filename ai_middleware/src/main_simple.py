@@ -166,7 +166,7 @@ async def handle_chat(chat_message: ChatMessage):
         
         if handoff_needed:
             # Send only the current request to keep it clean and readable
-            full_message = f"🔹 Customer Request: {chat_message.message}\n\n💡 Note: Customer was transferred from AI chat. Previous conversation history is available in the AI system if needed."
+            full_message = chat_message.message
             
             odoo_session_id = odoo_client.create_live_chat_session(
                 visitor_name=chat_message.visitor_name,

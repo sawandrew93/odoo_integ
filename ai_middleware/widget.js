@@ -324,10 +324,8 @@
                                 setTimeout(() => {
                                     showFeedbackSurvey();
                                 }, 2000);
-                            } else {
-                                // Regular agent message
-                                addMessage(`${msg.author}: ${msg.body}`);
                             }
+                            // Don't add regular messages here - they come via WebSocket
                             lastMessageId = msg.id;
                         }
                     });
@@ -351,23 +349,24 @@
         surveyDiv.style.cssText = 'background: white; padding: 20px; border-radius: 12px; margin: 15px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #e0e0e0; text-align: center;';
         
         surveyDiv.innerHTML = `
-            <div style="margin-bottom: 15px;">
-                <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #333;">Rate this conversation</h3>
-                <p style="margin: 0; font-size: 14px; color: #666;">How would you rate the quality of this conversation?</p>
+            <div style="margin-bottom: 15px; text-align: center;">
+                <div style="font-size: 32px; margin-bottom: 10px;">💬</div>
+                <h3 style="margin: 0 0 8px 0; font-size: 18px; color: #333; font-weight: 600;">Conversation ended</h3>
+                <p style="margin: 0; font-size: 14px; color: #666;">Please rate the quality of this conversation</p>
             </div>
-            <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;">
-                <span onclick="selectRating(1)" style="font-size: 24px; cursor: pointer; color: #ddd;" data-rating="1">⭐</span>
-                <span onclick="selectRating(2)" style="font-size: 24px; cursor: pointer; color: #ddd;" data-rating="2">⭐</span>
-                <span onclick="selectRating(3)" style="font-size: 24px; cursor: pointer; color: #ddd;" data-rating="3">⭐</span>
-                <span onclick="selectRating(4)" style="font-size: 24px; cursor: pointer; color: #ddd;" data-rating="4">⭐</span>
-                <span onclick="selectRating(5)" style="font-size: 24px; cursor: pointer; color: #ddd;" data-rating="5">⭐</span>
+            <div style="display: flex; justify-content: center; gap: 5px; margin-bottom: 15px;" id="star-rating">
+                <span class="rating-star" data-rating="1" style="font-size: 28px; cursor: pointer; color: #ddd; transition: color 0.2s;">★</span>
+                <span class="rating-star" data-rating="2" style="font-size: 28px; cursor: pointer; color: #ddd; transition: color 0.2s;">★</span>
+                <span class="rating-star" data-rating="3" style="font-size: 28px; cursor: pointer; color: #ddd; transition: color 0.2s;">★</span>
+                <span class="rating-star" data-rating="4" style="font-size: 28px; cursor: pointer; color: #ddd; transition: color 0.2s;">★</span>
+                <span class="rating-star" data-rating="5" style="font-size: 28px; cursor: pointer; color: #ddd; transition: color 0.2s;">★</span>
             </div>
-            <textarea id="feedback-comment" placeholder="Optional comment..." style="width: 100%; height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 6px; resize: none; font-family: inherit; margin-bottom: 15px;"></textarea>
+            <textarea id="feedback-comment" placeholder="Leave a comment (optional)" style="width: calc(100% - 16px); height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: none; font-family: inherit; margin-bottom: 15px; font-size: 14px;"></textarea>
             <div style="display: flex; justify-content: center; gap: 10px;">
-                <button onclick="submitFeedback()" style="padding: 10px 20px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
-                    Submit
+                <button onclick="submitFeedback()" style="padding: 8px 16px; background: #00a65a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500;">
+                    Send
                 </button>
-                <button onclick="closeSurvey()" style="padding: 10px 20px; background: transparent; color: #666; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 14px;">
+                <button onclick="closeSurvey()" style="padding: 8px 16px; background: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 14px;">
                     Skip
                 </button>
             </div>
@@ -375,15 +374,29 @@
         
         messagesDiv.appendChild(surveyDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        
+        // Add star click handlers
+        setTimeout(() => addStarHandlers(), 100);
     }
 
     let selectedRating = 0;
 
     window.selectRating = function(rating) {
         selectedRating = rating;
-        const stars = document.querySelectorAll('[data-rating]');
+        const stars = document.querySelectorAll('.rating-star');
         stars.forEach((star, index) => {
-            star.style.color = index < rating ? '#ffd700' : '#ddd';
+            star.style.color = index < rating ? '#ffc107' : '#ddd';
+        });
+    }
+    
+    // Add click handlers after survey is created
+    function addStarHandlers() {
+        const stars = document.querySelectorAll('.rating-star');
+        stars.forEach(star => {
+            star.addEventListener('click', function() {
+                const rating = parseInt(this.getAttribute('data-rating'));
+                selectRating(rating);
+            });
         });
     }
 
