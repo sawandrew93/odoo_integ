@@ -389,6 +389,30 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
     finally:
         ws_manager.disconnect(session_id)
 
+class FeedbackRequest(BaseModel):
+    session_id: int
+    rating: str
+    comment: Optional[str] = ""
+
+@app.post("/feedback")
+async def submit_feedback(feedback: FeedbackRequest):
+    """Submit customer feedback for a chat session"""
+    try:
+        success = odoo_client.store_feedback(
+            feedback.session_id,
+            feedback.rating,
+            feedback.comment
+        )
+        
+        if success:
+            return {"message": "Feedback submitted successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to store feedback")
+            
+    except Exception as e:
+        print(f"Feedback error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/widget.js")
 async def serve_widget():
     """Serve the chat widget JavaScript file"""

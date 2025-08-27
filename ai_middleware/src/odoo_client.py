@@ -234,8 +234,9 @@ class OdooClient:
                     # 1. Status is closed/ended
                     # 2. Has end datetime  
                     # 3. No operator assigned (agent left)
-                    if (status in ['closed', 'ended'] or end_dt or not operator_id):
-                        print(f"Session {session_id} is INACTIVE - status={status}, end_dt={end_dt}, operator={operator_id}")
+                    # 4. Less than 2 members (visitor + agent)
+                    if (status in ['closed', 'ended'] or end_dt or not operator_id or len(member_ids) < 2):
+                        print(f"Session {session_id} is INACTIVE - status={status}, end_dt={end_dt}, operator={operator_id}, members={len(member_ids)}")
                         return False
                     
                     print(f"Session {session_id} is ACTIVE")

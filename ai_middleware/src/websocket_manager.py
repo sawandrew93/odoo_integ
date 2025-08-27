@@ -95,8 +95,8 @@ class WebSocketManager:
         # Monitor session status separately
         try:
             while session_id in self.connections and not session_ended:
-                # Check session status every 30 seconds
-                await asyncio.sleep(30)
+                # Check session status every 10 seconds for faster detection
+                await asyncio.sleep(10)
                 
                 if not self.odoo_client.is_session_active(session_id):
                     # Get the last known agent name for the left message
