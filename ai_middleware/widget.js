@@ -52,7 +52,6 @@
         
         websocket.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            
             if (data.type === 'message') {
                 addMessage(`${data.data.author}: ${data.data.body}`);
             } else if (data.type === 'agent_joined') {
@@ -62,9 +61,6 @@
                 sessionEnded = true;
                 document.getElementById('message-input').disabled = true;
                 document.getElementById('send-btn').disabled = true;
-                setTimeout(() => showFeedbackSurvey(), 2000);
-            } else if (data.type === 'show_feedback') {
-                showFeedbackSurvey();
             }
         };
     }
@@ -94,19 +90,6 @@
                 sessionId = data.odoo_session_id;
                 addMessage(data.response);
                 connectWebSocket();
-                // Start polling session status
-                startSessionStatusPolling();
-            } else if (data.response === 'SESSION_ENDED') {
-                // Session has ended, show agent left message and feedback
-                sessionEnded = true;
-                addMessage('Agent left the channel', false, true);
-                document.getElementById('message-input').disabled = true;
-                document.getElementById('send-btn').disabled = true;
-                
-                // Show feedback survey after 2 seconds
-                setTimeout(() => {
-                    showFeedbackSurvey();
-                }, 2000);
             } else if (data.response) {
                 addMessage(data.response);
             }
@@ -177,116 +160,7 @@
     const widget = createWidget();
     addMessage('Hello! How can I help you today?');
     
-    let statusPollingInterval = null;
-    let sessionWasActive = true;
 
-    function startSessionStatusPolling() {
-        if (statusPollingInterval) return; // Already polling
-        
-        statusPollingInterval = setInterval(async () => {
-            if (!sessionId || sessionEnded) {
-                clearInterval(statusPollingInterval);
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${CONFIG.API_BASE}/session/${sessionId}/status`);
-                const data = await response.json();
-                
-                console.log('Session status check:', data);
-                
-                // If session was active but now inactive, agent left
-                if (sessionWasActive && !data.active) {
-                    console.log('Session became inactive, agent left');
-                    sessionWasActive = false;
-                    sessionEnded = true;
-                    addMessage('Agent left the channel', false, true);
-                    document.getElementById('message-input').disabled = true;
-                    document.getElementById('send-btn').disabled = true;
-                    
-                    // Show feedback survey after 2 seconds
-                    setTimeout(() => {
-                        console.log('Showing feedback after agent left');
-                        showFeedbackSurvey();
-                    }, 2000);
-                    
-                    clearInterval(statusPollingInterval);
-                }
-            } catch (error) {
-                console.log('Error checking session status:', error);
-            }
-        }, 3000); // Check every 3 seconds
-    }
-
-    function showFeedbackSurvey() {
-        // Auto-maximize widget to show survey
-        if (isMinimized) {
-            toggleMinimize();
-        }
-        
-        const messagesDiv = document.getElementById('chat-messages');
-        if (!messagesDiv) return;
-        
-        const surveyDiv = document.createElement('div');
-        surveyDiv.style.cssText = 'background: white; padding: 20px; border-radius: 12px; margin: 15px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #e0e0e0; text-align: center;';
-        
-        surveyDiv.innerHTML = `
-            <div style="margin-bottom: 15px;">
-                <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #333;">Rate this conversation</h3>
-                <p style="margin: 0; font-size: 14px; color: #666;">How would you rate the quality of this conversation?</p>
-            </div>
-            <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 15px;">
-                <button onclick="submitFeedback('satisfied')" style="padding: 12px 20px; background: #00a65a; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
-                    Satisfied
-                </button>
-                <button onclick="submitFeedback('not_satisfied')" style="padding: 12px 20px; background: #dd4b39; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">
-                    Not satisfied
-                </button>
-            </div>
-            <button onclick="closeSurvey()" style="padding: 6px 12px; background: transparent; color: #666; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 12px;">Skip</button>
-        `;
-        
-        messagesDiv.appendChild(surveyDiv);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-
-    // Debug function to check state and force feedback
-    window.debugWidget = function() {
-        console.log('sessionId:', sessionId);
-        console.log('sessionEnded:', sessionEnded);
-        console.log('isMinimized:', isMinimized);
-        console.log('websocket:', websocket);
-        console.log('websocket state:', websocket ? websocket.readyState : 'no websocket');
-        
-        // Force show feedback
-        console.log('Forcing feedback survey...');
-        showFeedbackSurvey();
-    };
-
-    window.submitFeedback = async function(rating) {
-        try {
-            await fetch(`${CONFIG.API_BASE}/feedback`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    session_id: sessionId,
-                    rating: rating,
-                    comment: ''
-                })
-            });
-            addMessage('Thank you for your feedback!', false, true);
-        } catch (error) {
-            addMessage('Thank you for your feedback!', false, true);
-        }
-        closeSurvey();
-    }
-
-    window.closeSurvey = function() {
-        const survey = document.querySelector('#chat-messages div[style*="background: white"]');
-        if (survey && survey.innerHTML.includes('Rate this conversation')) {
-            survey.remove();
-        }
-    }
 
     document.getElementById('send-btn').onclick = sendMessage;
     document.getElementById('message-input').onkeypress = (e) => {
