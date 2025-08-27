@@ -255,6 +255,8 @@
         console.log('sessionId:', sessionId);
         console.log('sessionEnded:', sessionEnded);
         console.log('isMinimized:', isMinimized);
+        console.log('websocket:', websocket);
+        console.log('websocket state:', websocket ? websocket.readyState : 'no websocket');
         
         // Force show feedback
         console.log('Forcing feedback survey...');
