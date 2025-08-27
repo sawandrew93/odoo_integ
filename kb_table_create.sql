@@ -4,6 +4,7 @@ CREATE TABLE knowledge_embeddings (
   content TEXT NOT NULL,
   embedding vector(768) NOT NULL,  -- Gemini embeddings are 768 dimensions
   content_hash VARCHAR(32) UNIQUE NOT NULL,
+  filename VARCHAR(255) DEFAULT 'legacy',
   created_at TIMESTAMP DEFAULT NOW()
 );
 
