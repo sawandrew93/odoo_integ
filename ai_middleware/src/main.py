@@ -278,6 +278,25 @@ async def get_connections():
         "monitoring_tasks": len(ws_manager.tasks)
     }
 
+@app.get("/download/{attachment_id}")
+async def download_attachment(attachment_id: int):
+    """Proxy endpoint for downloading attachments with authentication"""
+    try:
+        response = odoo_client.session.get(f"{odoo_client.url}/web/content/{attachment_id}?download=true")
+        if response.status_code == 200:
+            from fastapi.responses import Response
+            return Response(
+                content=response.content,
+                media_type=response.headers.get('content-type', 'application/octet-stream'),
+                headers={
+                    'Content-Disposition': response.headers.get('content-disposition', f'attachment; filename="file_{attachment_id}"')
+                }
+            )
+        else:
+            raise HTTPException(status_code=404, detail="File not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Download error: {str(e)}")
+
 @app.get("/admin/upload-progress/{session_id}")
 async def get_upload_progress(session_id: str, authorization: str = Header(None)):
     """Get real-time upload progress"""

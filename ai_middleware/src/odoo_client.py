@@ -1,6 +1,7 @@
 import requests
 import json
 import asyncio
+import os
 from typing import Dict, Any, Optional
 
 class OdooClient:
@@ -336,8 +337,9 @@ class OdooClient:
                 if result.get('result'):
                     attachments = []
                     for att in result['result']:
-                        # Create download URL for the attachment
-                        download_url = f"{self.url}/web/content/{att['id']}?download=true"
+                        # Create download URL through middleware proxy
+                        api_base = os.getenv('API_BASE', 'http://localhost:8000')
+                        download_url = f"{api_base}/download/{att['id']}"
                         attachments.append({
                             'id': att['id'],
                             'name': att['name'],
