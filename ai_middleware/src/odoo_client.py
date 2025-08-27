@@ -338,8 +338,7 @@ class OdooClient:
                     attachments = []
                     for att in result['result']:
                         # Create download URL through middleware proxy
-                        api_base = os.getenv('API_BASE', 'http://localhost:8000')
-                        download_url = f"{api_base}/download/{att['id']}"
+                        download_url = f"https://odoo.andrewdemo.online/download/{att['id']}"
                         attachments.append({
                             'id': att['id'],
                             'name': att['name'],
