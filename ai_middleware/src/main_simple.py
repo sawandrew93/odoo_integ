@@ -365,6 +365,30 @@ async def get_file_chunks(filename: str, token: str = Depends(verify_admin_token
         print(f"Error getting chunks: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: int):
+    """WebSocket endpoint for real-time chat communication"""
+    try:
+        await ws_manager.connect(websocket, session_id)
+        
+        while True:
+            try:
+                # Keep connection alive with ping/pong
+                data = await websocket.receive_text()
+                message = json.loads(data)
+                
+                if message.get('type') == 'ping':
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+                    
+            except Exception as e:
+                print(f"WebSocket error for session {session_id}: {e}")
+                break
+                
+    except WebSocketDisconnect:
+        print(f"WebSocket disconnected for session {session_id}")
+    finally:
+        ws_manager.disconnect(session_id)
+
 @app.get("/widget.js")
 async def serve_widget():
     """Serve the chat widget JavaScript file"""
