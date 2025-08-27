@@ -63,12 +63,17 @@ class WebSocketManager:
                     author = data['data']['author']
                     if not agent_joined and author != 'Website Visitor':
                         agent_joined = True
-                        # Store agent name for later use
-                        setattr(self, f'_agent_name_{session_id}', author)
+                        # Extract name only (after comma if exists)
+                        display_name = author.split(', ')[-1] if ', ' in author else author
+                        setattr(self, f'_agent_name_{session_id}', display_name)
                         await self.send_message(session_id, {
                             "type": "agent_joined",
-                            "message": f"{author} joined the chat"
+                            "message": f"{display_name} joined the chat"
                         })
+                    
+                    # Update message author to show only name
+                    if author != 'Website Visitor' and ', ' in author:
+                        data['data']['author'] = author.split(', ')[-1]
                     
                     await self.send_message(session_id, data)
                     

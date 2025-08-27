@@ -113,7 +113,7 @@
             if (isMobile) container.style.left = '20px';
             container.classList.add('maximized');
             chatBody.style.display = 'flex';
-            document.querySelector('#chat-header span').textContent = '💬 Chat Support';
+            document.querySelector('#chat-header span').textContent = '💬 Ask Vanguard';
             document.querySelector('#chat-header span').style.fontSize = '16px';
             document.querySelector('#chat-header').style.padding = '16px 20px';
             document.querySelector('#chat-header').style.background = 'rgba(255,255,255,0.1)';
