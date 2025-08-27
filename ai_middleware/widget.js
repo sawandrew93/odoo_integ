@@ -193,8 +193,11 @@
                 const response = await fetch(`${CONFIG.API_BASE}/session/${sessionId}/status`);
                 const data = await response.json();
                 
+                console.log('Session status check:', data);
+                
                 // If session was active but now inactive, agent left
                 if (sessionWasActive && !data.active) {
+                    console.log('Session became inactive, agent left');
                     sessionWasActive = false;
                     sessionEnded = true;
                     addMessage('Agent left the channel', false, true);
@@ -203,6 +206,7 @@
                     
                     // Show feedback survey after 2 seconds
                     setTimeout(() => {
+                        console.log('Showing feedback after agent left');
                         showFeedbackSurvey();
                     }, 2000);
                     
@@ -211,7 +215,7 @@
             } catch (error) {
                 console.log('Error checking session status:', error);
             }
-        }, 5000); // Check every 5 seconds
+        }, 3000); // Check every 3 seconds
     }
 
     function showFeedbackSurvey() {
