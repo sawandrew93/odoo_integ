@@ -222,6 +222,7 @@
     }
 
     function showFeedbackSurvey() {
+        console.log('showFeedbackSurvey called');
         const messagesDiv = document.getElementById('chat-messages');
         const surveyDiv = document.createElement('div');
         surveyDiv.innerHTML = `
@@ -244,6 +245,9 @@
         messagesDiv.appendChild(surveyDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
+
+    // Make showFeedbackSurvey globally accessible for testing
+    window.showFeedbackSurvey = showFeedbackSurvey;
 
     window.submitFeedback = async function(rating) {
         try {
