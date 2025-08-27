@@ -213,6 +213,7 @@
                 sessionId = data.odoo_session_id;
                 addMessage(data.response);
                 connectWebSocket();
+                startSessionMonitoring();
             } else if (data.response) {
                 addMessage(data.response);
             }
@@ -287,6 +288,55 @@
     addMessage('Hello! How can I help you today?');
     
 
+
+    let monitoringInterval = null;
+
+    let lastMessageId = 0;
+    
+    function startSessionMonitoring() {
+        if (monitoringInterval || !sessionId) return;
+        
+        monitoringInterval = setInterval(async () => {
+            if (sessionEnded) {
+                clearInterval(monitoringInterval);
+                return;
+            }
+            
+            try {
+                // Get messages to check for agent left
+                const response = await fetch(`${CONFIG.API_BASE}/messages/${sessionId}`);
+                const data = await response.json();
+                
+                if (data.messages && data.messages.length > 0) {
+                    const sortedMessages = data.messages.sort((a, b) => a.id - b.id);
+                    
+                    sortedMessages.forEach(msg => {
+                        if (msg.id > lastMessageId) {
+                            // Check if agent left the conversation
+                            if (msg.body.includes('left the channel') || msg.body.includes('left the conversation')) {
+                                sessionEnded = true;
+                                addMessage('Agent left the channel', false, true);
+                                document.getElementById('message-input').disabled = true;
+                                document.getElementById('send-btn').disabled = true;
+                                clearInterval(monitoringInterval);
+                                
+                                // Show feedback survey after 2 seconds
+                                setTimeout(() => {
+                                    showFeedbackSurvey();
+                                }, 2000);
+                            } else {
+                                // Regular agent message
+                                addMessage(`${msg.author}: ${msg.body}`);
+                            }
+                            lastMessageId = msg.id;
+                        }
+                    });
+                }
+            } catch (error) {
+                // Continue monitoring on error
+            }
+        }, 1500); // Check every 1.5 seconds like working code
+    }
 
     function showFeedbackSurvey() {
         // Auto-maximize widget to show survey

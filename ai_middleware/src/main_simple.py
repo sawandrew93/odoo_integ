@@ -423,6 +423,16 @@ async def get_session_status(session_id: int):
         print(f"Error checking session status: {e}")
         return {"active": False}
 
+@app.get("/messages/{session_id}")
+async def get_messages(session_id: int):
+    """Get messages from Odoo live chat session"""
+    try:
+        messages = odoo_client.get_session_messages(session_id)
+        return {"messages": messages}
+    except Exception as e:
+        print(f"Error getting messages: {e}")
+        return {"messages": []}
+
 @app.get("/widget.js")
 async def serve_widget():
     """Serve the chat widget JavaScript file"""

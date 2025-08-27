@@ -366,7 +366,50 @@ class OdooClient:
         
         return []
     
-    def store_feedback(self, session_id: int, rating: str, comment: str = "") -> bool:
+    def get_session_messages(self, session_id: int) -> list:
+        """Get messages from a live chat session"""
+        try:
+            message_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "mail.message",
+                    "method": "search_read",
+                    "args": [[
+                        ["res_id", "=", session_id], 
+                        ["model", "=", "discuss.channel"]
+                    ], ["id", "body", "author_id", "date"]],
+                    "kwargs": {"order": "date asc"}
+                },
+                "id": 10
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    messages = []
+                    for msg in result['result']:
+                        import re
+                        clean_body = re.sub(r'<[^>]+>', '', msg['body']) if msg['body'] else ''
+                        author_name = msg['author_id'][1] if isinstance(msg['author_id'], list) else 'System'
+                        
+                        messages.append({
+                            'id': msg['id'],
+                            'body': clean_body,
+                            'author': author_name,
+                            'date': msg['date']
+                        })
+                    return messages
+            
+            return []
+            
+        except Exception as e:
+            print(f"Error getting messages: {e}")
+            return []
+    
+    def store_feedback(self, session_id: int, rating: int, comment: str = "") -> bool:
         """Store feedback for a chat session in Odoo"""
         try:
             feedback_data = {
@@ -377,7 +420,7 @@ class OdooClient:
                     "method": "message_post",
                     "args": [session_id],
                     "kwargs": {
-                        "body": f"<p><strong>Customer Feedback:</strong> {rating.upper()}</p><p>{comment}</p>",
+                        "body": f"<p><strong>Customer Feedback:</strong> {rating}/5 stars</p><p>{comment}</p>",
                         "message_type": "comment",
                         "subtype_xmlid": "mail.mt_note"
                     }
@@ -390,7 +433,7 @@ class OdooClient:
             if response.status_code == 200:
                 result = response.json()
                 if result.get('result'):
-                    print(f"✅ Feedback stored for session {session_id}: {rating}")
+                    print(f"✅ Feedback stored for session {session_id}: {rating}/5")
                     return True
             
             return False
