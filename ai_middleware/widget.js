@@ -325,7 +325,10 @@
                                     showFeedbackSurvey();
                                 }, 2000);
                             }
-                            // Don't add regular messages here - they come via WebSocket
+                            // Skip feedback messages (don't show to visitor)
+                            else if (!msg.body.includes('Customer Feedback:')) {
+                                // Don't add regular messages here - they come via WebSocket
+                            }
                             lastMessageId = msg.id;
                         }
                     });
