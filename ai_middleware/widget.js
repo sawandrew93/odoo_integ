@@ -21,11 +21,11 @@
                 <div id="chat-body" style="flex:1;display:none;flex-direction:column;background:white;min-height:0;">
                     <div id="chat-messages" style="flex:1;padding:20px;overflow-y:auto;background:linear-gradient(to bottom,#f8f9fa,#ffffff);min-height:0;"></div>
                     <div style="padding:16px 20px;background:white;border-top:1px solid #e9ecef;flex-shrink:0;">
-                        <div style="display:flex;gap:8px;align-items:end;">
-                            <input type="text" id="message-input" placeholder="Type your message..." style="flex:1;padding:12px 16px;border:2px solid #e9ecef;border-radius:25px;outline:none;font-size:14px;transition:border-color 0.2s ease;">
+                        <div style="display:flex;gap:8px;align-items:stretch;padding:0;">
+                            <input type="text" id="message-input" placeholder="Type your message..." style="flex:1;padding:12px 16px;border:2px solid #e9ecef;border-radius:25px;outline:none;font-size:14px;transition:border-color 0.2s ease;min-width:0;">
                             <input type="file" id="file-input" style="display:none;" accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.zip,.mp3,.wav,.ogg,.mp4,.avi,.mov">
-                            <button id="attach-btn" style="padding:12px;background:#f8f9fa;color:#666;border:1px solid #e9ecef;border-radius:50%;cursor:pointer;font-size:16px;width:48px;height:48px;display:none;" title="Attach file">📄</button>
-                            <button id="send-btn" style="padding:12px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:25px;cursor:pointer;font-weight:600;transition:transform 0.2s ease;min-width:60px;">Send</button>
+                            <button id="attach-btn" style="padding:12px;background:#f8f9fa;color:#666;border:1px solid #e9ecef;border-radius:50%;cursor:pointer;font-size:16px;width:48px;height:48px;display:none;flex-shrink:0;" title="Attach file">📄</button>
+                            <button id="send-btn" style="padding:12px 16px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:25px;cursor:pointer;font-weight:600;transition:transform 0.2s ease;white-space:nowrap;flex-shrink:0;">Send</button>
                         </div>
                     </div>
                     <div id="menu-dropdown" style="position:absolute;top:60px;right:20px;background:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);border:1px solid #e9ecef;min-width:160px;display:none;z-index:10000;">
@@ -341,9 +341,12 @@
         @media (max-width: 480px) {
             #chat-container.maximized { width: calc(100vw - 20px) !important; height: calc(100vh - 80px) !important; bottom: 10px !important; right: 10px !important; left: 10px !important; }
             #chat-container { bottom: 10px !important; right: 10px !important; }
+            #send-btn { padding: 12px 12px !important; font-size: 13px !important; }
+            #message-input { font-size: 16px !important; }
         }
         @media (max-width: 360px) {
             #chat-container.maximized { width: calc(100vw - 10px) !important; height: calc(100vh - 60px) !important; bottom: 5px !important; right: 5px !important; left: 5px !important; }
+            #send-btn { padding: 12px 8px !important; min-width: 50px !important; }
         }
     `;
     document.head.appendChild(style);
@@ -477,6 +480,16 @@
         
         const comment = document.getElementById('feedback-comment')?.value || '';
         
+        // Fade out survey
+        const surveys = document.querySelectorAll('#chat-messages > div');
+        surveys.forEach(survey => {
+            if (survey.innerHTML && (survey.innerHTML.includes('Conversation Complete') || survey.innerHTML.includes('rate your experience'))) {
+                survey.style.transition = 'opacity 0.3s ease';
+                survey.style.opacity = '0';
+                setTimeout(() => survey.remove(), 300);
+            }
+        });
+        
         try {
             await fetch(`${CONFIG.API_BASE}/feedback`, {
                 method: 'POST',
@@ -487,18 +500,22 @@
                     comment: comment
                 })
             });
-            addMessage('Thank you for your feedback!', false, true);
+            setTimeout(() => addMessage('Thank you for your feedback!', false, true), 300);
         } catch (error) {
-            addMessage('Thank you for your feedback!', false, true);
+            setTimeout(() => addMessage('Thank you for your feedback!', false, true), 300);
         }
-        closeSurvey();
+        selectedRating = 0;
     }
 
     window.closeSurvey = function() {
-        const survey = document.querySelector('#chat-messages div[style*="background: white"]');
-        if (survey && (survey.innerHTML.includes('Rate this conversation') || survey.innerHTML.includes('Conversation ended'))) {
-            survey.remove();
-        }
+        const surveys = document.querySelectorAll('#chat-messages > div');
+        surveys.forEach(survey => {
+            if (survey.innerHTML && (survey.innerHTML.includes('Conversation Complete') || survey.innerHTML.includes('rate your experience'))) {
+                survey.style.transition = 'opacity 0.3s ease';
+                survey.style.opacity = '0';
+                setTimeout(() => survey.remove(), 300);
+            }
+        });
         selectedRating = 0;
     }
     
