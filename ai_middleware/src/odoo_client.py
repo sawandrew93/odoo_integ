@@ -2,6 +2,7 @@ import requests
 import json
 import asyncio
 import os
+import base64
 from typing import Dict, Any, Optional
 
 class OdooClient:
@@ -447,4 +448,75 @@ class OdooClient:
             
         except Exception as e:
             print(f"Error storing feedback: {e}")
+            return False
+    
+    def send_file_to_session(self, session_id: int, file_name: str, file_content: bytes, content_type: str, message: str = "") -> bool:
+        """Send file attachment to Odoo live chat session"""
+        try:
+            if not self.uid:
+                if not self.authenticate():
+                    return False
+            
+            # Create attachment in Odoo
+            import base64
+            file_data = base64.b64encode(file_content).decode('utf-8')
+            
+            attachment_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "ir.attachment",
+                    "method": "create",
+                    "args": [{
+                        "name": file_name,
+                        "datas": file_data,
+                        "res_model": "discuss.channel",
+                        "res_id": session_id,
+                        "mimetype": content_type
+                    }],
+                    "kwargs": {}
+                },
+                "id": 11
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=attachment_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    attachment_id = result['result']
+                    
+                    # Send message with attachment
+                    message_body = message if message else f"📎 {file_name}"
+                    
+                    message_data = {
+                        "jsonrpc": "2.0",
+                        "method": "call",
+                        "params": {
+                            "model": "discuss.channel",
+                            "method": "message_post",
+                            "args": [session_id],
+                            "kwargs": {
+                                "body": message_body,
+                                "message_type": "comment",
+                                "attachment_ids": [attachment_id],
+                                "author_id": False,
+                                "email_from": "Website Visitor <visitor@livechat.com>"
+                            }
+                        },
+                        "id": 12
+                    }
+                    
+                    msg_response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+                    
+                    if msg_response.status_code == 200:
+                        msg_result = msg_response.json()
+                        if msg_result.get('result'):
+                            print(f"✅ File {file_name} sent to session {session_id}")
+                            return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"Error sending file: {e}")
             return False

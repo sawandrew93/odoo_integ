@@ -20,8 +20,10 @@
                 <div id="chat-body" style="flex:1;display:none;flex-direction:column;background:white;min-height:0;">
                     <div id="chat-messages" style="flex:1;padding:20px;overflow-y:auto;background:linear-gradient(to bottom,#f8f9fa,#ffffff);min-height:0;"></div>
                     <div style="padding:16px 20px;background:white;border-top:1px solid #e9ecef;flex-shrink:0;">
-                        <div style="display:flex;gap:8px;">
+                        <div style="display:flex;gap:8px;align-items:end;">
                             <input type="text" id="message-input" placeholder="Type your message..." style="flex:1;padding:12px 16px;border:2px solid #e9ecef;border-radius:25px;outline:none;font-size:14px;transition:border-color 0.2s ease;">
+                            <input type="file" id="file-input" style="display:none;" accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.zip,.mp3,.wav,.ogg,.mp4,.avi,.mov">
+                            <button id="attach-btn" style="padding:12px;background:#f8f9fa;color:#666;border:1px solid #e9ecef;border-radius:50%;cursor:pointer;font-size:16px;width:48px;height:48px;display:none;" title="Attach file">📎</button>
                             <button id="send-btn" style="padding:12px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:25px;cursor:pointer;font-weight:600;transition:transform 0.2s ease;min-width:60px;">Send</button>
                         </div>
                     </div>
@@ -190,9 +192,23 @@
 
     async function sendMessage() {
         const input = document.getElementById('message-input');
+        const fileInput = document.getElementById('file-input');
         const message = input.value.trim();
-        if (!message || sessionEnded) return;
+        const file = fileInput.files[0];
+        
+        if (!message && !file) return;
+        if (sessionEnded) return;
 
+        // Handle file upload if connected to agent
+        if (file && sessionId) {
+            await sendFileToAgent(file, message);
+            input.value = '';
+            fileInput.value = '';
+            return;
+        }
+        
+        // Regular message handling
+        if (!message) return;
         addMessage(message, true);
         input.value = '';
 
@@ -214,11 +230,39 @@
                 addMessage(data.response);
                 connectWebSocket();
                 startSessionMonitoring();
+                // Show attach button after connecting to agent
+                document.getElementById('attach-btn').style.display = 'block';
             } else if (data.response) {
                 addMessage(data.response);
             }
         } catch (error) {
             addMessage('Sorry, there was an error. Please try again.');
+        }
+    }
+    
+    async function sendFileToAgent(file, message = '') {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('session_id', sessionId);
+        if (message) formData.append('message', message);
+        
+        // Show uploading message
+        const uploadMsg = message ? `${message} (uploading ${file.name}...)` : `Uploading ${file.name}...`;
+        addMessage(uploadMsg, true);
+        
+        try {
+            const response = await fetch(`${CONFIG.API_BASE}/upload-file`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                // File uploaded successfully - message will appear via WebSocket
+            } else {
+                addMessage('Failed to upload file. Please try again.');
+            }
+        } catch (error) {
+            addMessage('Failed to upload file. Please try again.');
         }
     }
 
@@ -439,6 +483,15 @@
     document.getElementById('send-btn').onclick = sendMessage;
     document.getElementById('message-input').onkeypress = (e) => {
         if (e.key === 'Enter') sendMessage();
+    };
+    document.getElementById('attach-btn').onclick = () => {
+        document.getElementById('file-input').click();
+    };
+    document.getElementById('file-input').onchange = (e) => {
+        if (e.target.files[0] && sessionId) {
+            // Auto-send file when selected (if connected to agent)
+            sendMessage();
+        }
     };
     document.getElementById('chat-header').onclick = toggleMinimize;
 })();

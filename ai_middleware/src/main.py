@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Depends, Header
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Depends, Header, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ import io
 import secrets
 import hashlib
 import re
+import base64
 
 from .odoo_client import OdooClient
 from .ai_agent import AIAgent
@@ -207,6 +208,16 @@ async def get_session_status(session_id: int):
         print(f"Error checking session status: {e}")
         return {"active": False}
 
+@app.get("/messages/{session_id}")
+async def get_session_messages(session_id: int):
+    """Get messages from a session"""
+    try:
+        messages = odoo_client.get_session_messages(session_id)
+        return {"messages": messages}
+    except Exception as e:
+        print(f"Error getting messages: {e}")
+        return {"messages": []}
+
 class FeedbackRequest(BaseModel):
     session_id: int
     rating: str
@@ -231,6 +242,48 @@ async def submit_feedback(feedback: FeedbackRequest):
     except Exception as e:
         print(f"Feedback error: {e}")
         raise HTTPException(status_code=500, detail=f"Error submitting feedback: {str(e)}")
+
+@app.post("/upload-file")
+async def upload_file_to_session(
+    file: UploadFile = File(...),
+    session_id: int = Form(...),
+    message: Optional[str] = Form("")
+):
+    """Upload file to Odoo live chat session"""
+    try:
+        # Validate file type (Odoo live chat supported formats)
+        allowed_types = {
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+            'application/pdf', 'text/plain',
+            'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/zip', 'application/x-zip-compressed',
+            'audio/mpeg', 'audio/wav', 'audio/ogg',
+            'video/mp4', 'video/avi', 'video/quicktime'
+        }
+        
+        if file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="File type not supported")
+        
+        # Read file content
+        file_content = await file.read()
+        
+        # Send file to Odoo session
+        success = odoo_client.send_file_to_session(
+            session_id=session_id,
+            file_name=file.filename,
+            file_content=file_content,
+            content_type=file.content_type,
+            message=message
+        )
+        
+        if success:
+            return {"status": "success", "message": "File uploaded successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to upload file to Odoo")
+            
+    except Exception as e:
+        print(f"File upload error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: int):
