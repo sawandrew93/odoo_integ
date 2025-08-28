@@ -418,8 +418,14 @@ class OdooClient:
             return []
     
     def store_feedback(self, session_id: int, rating: int, comment: str = "") -> bool:
-        """Store feedback for a chat session in Odoo"""
+        """Store feedback for a chat session in Odoo (internal only)"""
         try:
+            # Create feedback text
+            feedback_text = f"Customer Feedback: {rating}/5 stars"
+            if comment.strip():
+                feedback_text += f" - {comment}"
+            
+            # Store as internal note (not visible to agents in chat)
             feedback_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -428,9 +434,10 @@ class OdooClient:
                     "method": "message_post",
                     "args": [session_id],
                     "kwargs": {
-                        "body": f"<p><strong>Customer Feedback:</strong> {rating}/5 stars</p><p>{comment}</p>",
-                        "message_type": "comment",
-                        "subtype_xmlid": "mail.mt_note"
+                        "body": feedback_text,
+                        "message_type": "notification",
+                        "subtype_xmlid": "mail.mt_note",
+                        "internal": True
                     }
                 },
                 "id": 9
@@ -441,13 +448,53 @@ class OdooClient:
             if response.status_code == 200:
                 result = response.json()
                 if result.get('result'):
-                    print(f"✅ Feedback stored for session {session_id}: {rating}/5")
+                    print(f"✅ Feedback stored internally for session {session_id}: {rating}/5")
                     return True
             
             return False
             
         except Exception as e:
             print(f"Error storing feedback: {e}")
+            return False
+    
+    def end_live_chat_session(self, session_id: int, message: str) -> bool:
+        """End live chat session properly"""
+        try:
+            if not self.uid:
+                if not self.authenticate():
+                    return False
+            
+            # Send final message
+            self.send_message_to_session(session_id, message, "System")
+            
+            # Close the session
+            close_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "write",
+                    "args": [[session_id], {
+                        "livechat_status": "closed",
+                        "livechat_end_dt": "now"
+                    }],
+                    "kwargs": {}
+                },
+                "id": 13
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=close_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    print(f"✅ Session {session_id} closed")
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"Error ending session: {e}")
             return False
     
     def send_file_to_session(self, session_id: int, file_name: str, file_content: bytes, content_type: str, message: str = "") -> bool:

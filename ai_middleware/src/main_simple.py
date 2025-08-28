@@ -495,11 +495,10 @@ async def end_session(session_data: dict):
         if not session_id:
             raise HTTPException(status_code=400, detail="Session ID required")
         
-        # Send notification to agent that visitor ended the chat
-        success = odoo_client.send_message_to_session(
+        # Send notification to agent and close session
+        success = odoo_client.end_live_chat_session(
             int(session_id),
-            "Visitor has ended the conversation.",
-            "System"
+            "Visitor has ended the conversation."
         )
         
         return {"status": "success", "message": "Session ended"}

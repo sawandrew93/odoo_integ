@@ -132,6 +132,7 @@
         
         messagesDiv.appendChild(messageDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        return messageDiv;
     }
     
     function getFileIcon(mimetype) {
@@ -253,7 +254,7 @@
         
         // Show uploading message
         const uploadMsg = message ? `${message} (uploading ${file.name}...)` : `Uploading ${file.name}...`;
-        addMessage(uploadMsg, true);
+        const uploadMsgElement = addMessage(uploadMsg, true);
         
         try {
             const response = await fetch(`${CONFIG.API_BASE}/upload-file`, {
@@ -261,12 +262,19 @@
                 body: formData
             });
             
-            if (response.ok) {
-                // File uploaded successfully - message will appear via WebSocket
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                // Remove uploading message and show success
+                uploadMsgElement.remove();
+                const successMsg = message ? `${message} 📎 ${file.name}` : `📎 ${file.name}`;
+                addMessage(successMsg, true);
             } else {
+                uploadMsgElement.remove();
                 addMessage('Failed to upload file. Please try again.');
             }
         } catch (error) {
+            uploadMsgElement.remove();
             addMessage('Failed to upload file. Please try again.');
         }
     }
