@@ -92,21 +92,36 @@ class OdooClient:
             print(f"Attempting to create session for channel {channel_id} with visitor {visitor_name}")
             
             try:
-                rpc_data = {
+                # Try public endpoint first (no auth needed)
+                init_data = {
                     "jsonrpc": "2.0",
                     "method": "call",
                     "params": {
                         "channel_id": channel_id,
-                        "anonymous_name": visitor_name,
-                        "previous_operator_id": False,
-                        "country_id": False,
-                        "user_id": False,
-                        "persisted": True
+                        "anonymous_name": visitor_name
                     },
                     "id": 2
                 }
                 
-                response = self.session.post(f"{self.url}/im_livechat/get_session", json=rpc_data)
+                response = self.session.post(f"{self.url}/im_livechat/init", json=init_data)
+                
+                # If init fails, try original method
+                if response.status_code != 200:
+                    rpc_data = {
+                        "jsonrpc": "2.0",
+                        "method": "call",
+                        "params": {
+                            "channel_id": channel_id,
+                            "anonymous_name": visitor_name,
+                            "previous_operator_id": False,
+                            "country_id": False,
+                            "user_id": False,
+                            "persisted": True
+                        },
+                        "id": 2
+                    }
+                    
+                    response = self.session.post(f"{self.url}/im_livechat/get_session", json=rpc_data)
                 
                 if response.status_code == 200:
                     try:
