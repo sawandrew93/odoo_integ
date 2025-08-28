@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Depends, Header
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Depends, Header, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ import io
 import secrets
 import hashlib
 import re
+import base64
 
 from .odoo_client import OdooClient
 from .ai_agent import AIAgent
@@ -441,6 +442,71 @@ async def serve_widget():
         return FileResponse(widget_path, media_type="application/javascript")
     else:
         raise HTTPException(status_code=404, detail="Widget file not found")
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "service": "AI Middleware"}
+
+@app.post("/upload-file")
+async def upload_file_to_session(
+    file: UploadFile = File(...),
+    session_id: int = Form(...),
+    message: Optional[str] = Form("")
+):
+    """Upload file to Odoo live chat session"""
+    try:
+        allowed_types = {
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+            'application/pdf', 'text/plain',
+            'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/zip', 'application/x-zip-compressed',
+            'audio/mpeg', 'audio/wav', 'audio/ogg',
+            'video/mp4', 'video/avi', 'video/quicktime'
+        }
+        
+        if file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="File type not supported")
+        
+        file_content = await file.read()
+        
+        success = odoo_client.send_file_to_session(
+            session_id=session_id,
+            file_name=file.filename,
+            file_content=file_content,
+            content_type=file.content_type,
+            message=message
+        )
+        
+        if success:
+            return {"status": "success", "message": "File uploaded successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to upload file to Odoo")
+            
+    except Exception as e:
+        print(f"File upload error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
+
+@app.post("/end-session")
+async def end_session(session_data: dict):
+    """End chat session from visitor side"""
+    try:
+        session_id = session_data.get('session_id')
+        if not session_id:
+            raise HTTPException(status_code=400, detail="Session ID required")
+        
+        # Send notification to agent that visitor ended the chat
+        success = odoo_client.send_message_to_session(
+            int(session_id),
+            "Visitor has ended the conversation.",
+            "System"
+        )
+        
+        return {"status": "success", "message": "Session ended"}
+        
+    except Exception as e:
+        print(f"End session error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error ending session: {str(e)}")
 
 @app.get("/download/{attachment_id}")
 async def download_attachment(attachment_id: int):

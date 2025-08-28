@@ -14,8 +14,9 @@
         widget.id = 'ai-chat-widget';
         widget.innerHTML = `
             <div id="chat-container" style="position:fixed;bottom:20px;right:20px;width:60px;height:60px;border:none;border-radius:50%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;flex-direction:column;z-index:9999;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;transition:all 0.3s ease;overflow:hidden;">
-                <div id="chat-header" style="padding:0;background:transparent;color:white;font-weight:600;cursor:pointer;display:flex;justify-content:center;align-items:center;flex-shrink:0;width:100%;height:100%;">
+                <div id="chat-header" style="padding:0;background:transparent;color:white;font-weight:600;cursor:pointer;display:flex;justify-content:center;align-items:center;flex-shrink:0;width:100%;height:100%;position:relative;">
                     <span style="font-size:24px;">💬</span>
+                    <div id="menu-btn" style="position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.2);display:none;align-items:center;justify-content:center;cursor:pointer;font-size:12px;" onclick="event.stopPropagation();toggleMenu();">⋯</div>
                 </div>
                 <div id="chat-body" style="flex:1;display:none;flex-direction:column;background:white;min-height:0;">
                     <div id="chat-messages" style="flex:1;padding:20px;overflow-y:auto;background:linear-gradient(to bottom,#f8f9fa,#ffffff);min-height:0;"></div>
@@ -26,6 +27,10 @@
                             <button id="attach-btn" style="padding:12px;background:#f8f9fa;color:#666;border:1px solid #e9ecef;border-radius:50%;cursor:pointer;font-size:16px;width:48px;height:48px;display:none;" title="Attach file">📎</button>
                             <button id="send-btn" style="padding:12px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:25px;cursor:pointer;font-weight:600;transition:transform 0.2s ease;min-width:60px;">Send</button>
                         </div>
+                    </div>
+                    <div id="menu-dropdown" style="position:absolute;top:60px;right:20px;background:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);border:1px solid #e9ecef;min-width:160px;display:none;z-index:10000;">
+                        <div onclick="clearConversation()" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid #f1f3f4;color:#333;font-size:14px;transition:background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">🗑️ Clear conversation</div>
+                        <div onclick="endConversation()" style="padding:12px 16px;cursor:pointer;color:#dc3545;font-size:14px;transition:background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">❌ End conversation</div>
                     </div>
                 </div>
             </div>
@@ -287,6 +292,7 @@
             document.querySelector('#chat-header').style.background = 'rgba(255,255,255,0.1)';
             document.querySelector('#chat-header').style.borderBottom = '1px solid rgba(255,255,255,0.1)';
             document.querySelector('#chat-header').style.height = '60px';
+            document.getElementById('menu-btn').style.display = 'flex';
             isMinimized = false;
         } else {
             // Minimize - fixed small circle
@@ -304,6 +310,8 @@
             document.querySelector('#chat-header').style.background = 'transparent';
             document.querySelector('#chat-header').style.borderBottom = 'none';
             document.querySelector('#chat-header').style.height = '100%';
+            document.getElementById('menu-btn').style.display = 'none';
+            document.getElementById('menu-dropdown').style.display = 'none';
             isMinimized = true;
         }
     }
@@ -321,6 +329,7 @@
         .attachment-link:hover { opacity: 0.8 !important; }
         .attachment-item { transition: background-color 0.2s ease !important; }
         .attachment-item:hover { background: rgba(255,255,255,0.15) !important; }
+        #menu-btn:hover { background: rgba(255,255,255,0.3) !important; }
         @media (max-width: 480px) {
             #chat-container.maximized { width: calc(100vw - 40px) !important; height: calc(100vh - 40px) !important; bottom: 20px !important; right: 20px !important; left: 20px !important; }
         }
@@ -479,6 +488,56 @@
         }
         selectedRating = 0;
     }
+    
+    window.toggleMenu = function() {
+        const menu = document.getElementById('menu-dropdown');
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+    
+    window.clearConversation = function() {
+        const messagesDiv = document.getElementById('chat-messages');
+        messagesDiv.innerHTML = '';
+        addMessage('Conversation cleared. How can I help you?');
+        document.getElementById('menu-dropdown').style.display = 'none';
+    }
+    
+    window.endConversation = async function() {
+        document.getElementById('menu-dropdown').style.display = 'none';
+        
+        if (sessionId) {
+            try {
+                await fetch(`${CONFIG.API_BASE}/end-session`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({session_id: sessionId})
+                });
+            } catch (error) {
+                console.log('Error ending session:', error);
+            }
+            
+            addMessage('You ended the conversation', false, true);
+            sessionEnded = true;
+            document.getElementById('message-input').disabled = true;
+            document.getElementById('send-btn').disabled = true;
+            document.getElementById('attach-btn').style.display = 'none';
+            
+            setTimeout(() => {
+                showFeedbackSurvey();
+            }, 2000);
+        } else {
+            // Just clear and reset if no active session
+            clearConversation();
+        }
+    }
+    
+    // Close menu when clicking outside
+    document.addEventListener('click', function(event) {
+        const menu = document.getElementById('menu-dropdown');
+        const menuBtn = document.getElementById('menu-btn');
+        if (menu && !menu.contains(event.target) && !menuBtn.contains(event.target)) {
+            menu.style.display = 'none';
+        }
+    });
 
     document.getElementById('send-btn').onclick = sendMessage;
     document.getElementById('message-input').onkeypress = (e) => {
@@ -493,5 +552,9 @@
             sendMessage();
         }
     };
-    document.getElementById('chat-header').onclick = toggleMinimize;
+    document.getElementById('chat-header').onclick = function(e) {
+        if (e.target.id !== 'menu-btn') {
+            toggleMinimize();
+        }
+    };
 })();
