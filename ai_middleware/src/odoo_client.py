@@ -122,23 +122,57 @@ class OdooClient:
                                 session_id = channels[0]['id']
                                 print(f"✅ Live chat session created! ID: {session_id}")
                                 
-                                # Transfer session ownership to system user (OdooBot)
+                                # Fix visitor identity - remove partner_id to make it truly anonymous
                                 try:
-                                    transfer_data = {
+                                    # Update session to be created by system user
+                                    session_fix = {
                                         "jsonrpc": "2.0",
                                         "method": "call",
                                         "params": {
                                             "model": "discuss.channel",
                                             "method": "write",
-                                            "args": [[session_id], {"create_uid": 1}],  # System user
+                                            "args": [[session_id], {"create_uid": 1}],
                                             "kwargs": {}
                                         },
                                         "id": 16
                                     }
-                                    self.session.post(f"{self.url}/web/dataset/call_kw", json=transfer_data)
-                                    print(f"⚙️ Transferred session {session_id} ownership to system user")
+                                    self.session.post(f"{self.url}/web/dataset/call_kw", json=session_fix)
+                                    
+                                    # Find and fix visitor to remove partner_id
+                                    visitor_search = {
+                                        "jsonrpc": "2.0",
+                                        "method": "call",
+                                        "params": {
+                                            "model": "im_livechat.visitor",
+                                            "method": "search",
+                                            "args": [["partner_id", "=", self.uid]],
+                                            "kwargs": {"limit": 1, "order": "id desc"}
+                                        },
+                                        "id": 17
+                                    }
+                                    
+                                    visitor_resp = self.session.post(f"{self.url}/web/dataset/call_kw", json=visitor_search)
+                                    if visitor_resp.status_code == 200:
+                                        visitor_result = visitor_resp.json()
+                                        if visitor_result.get('result'):
+                                            visitor_id = visitor_result['result'][0]
+                                            # Remove partner_id from visitor
+                                            visitor_fix = {
+                                                "jsonrpc": "2.0",
+                                                "method": "call",
+                                                "params": {
+                                                    "model": "im_livechat.visitor",
+                                                    "method": "write",
+                                                    "args": [[visitor_id], {"partner_id": False}],
+                                                    "kwargs": {}
+                                                },
+                                                "id": 18
+                                            }
+                                            self.session.post(f"{self.url}/web/dataset/call_kw", json=visitor_fix)
+                                    
+                                    print(f"⚙️ Fixed session {session_id} visitor identity")
                                 except Exception as e:
-                                    print(f"Warning: Could not transfer ownership: {e}")
+                                    print(f"Warning: Could not fix visitor identity: {e}")
                                 
                                 # Send the initial message as visitor
                                 self.send_message_to_session(session_id, message, visitor_name)
