@@ -73,9 +73,9 @@ class AIAgent:
                 self.conversation_history[session_key].append(f"AI: {response}")
                 return True, response, 0.0
         
-        # Handle greetings
+        # Handle greetings with dynamic knowledge base topics
         if self._is_greeting(message_lower) and current_state == ConversationState.GREETING:
-            response = self._generate_greeting_response()
+            response = self._generate_dynamic_greeting_response()
             self.conversation_states[session_key] = ConversationState.HELPING
             self.conversation_history[session_key].append(f"AI: {response}")
             return False, response, 0.95
@@ -117,14 +117,59 @@ Answer:"""
     def _detect_frustration(self, message: str) -> bool:
         return any(re.search(pattern, message, re.IGNORECASE) for pattern in self.frustration_patterns)
     
-    def _generate_greeting_response(self) -> str:
-        import random
-        greetings = [
-            "Hello! I'm here to help you with any questions you might have. What can I assist you with today?",
-            "Hi there! How can I help you today?",
-            "Hello! I'm your AI assistant. What would you like to know?"
-        ]
-        return random.choice(greetings)
+    def _generate_dynamic_greeting_response(self) -> str:
+        """Generate greeting with dynamic topics from knowledge base"""
+        try:
+            # Get sample topics from knowledge base
+            topics = self._get_available_topics()
+            
+            if topics:
+                topics_text = ", ".join(topics[:3])  # Show first 3 topics
+                if len(topics) > 3:
+                    topics_text += ", and more"
+                
+                import random
+                greetings = [
+                    f"Hello! I can help you with questions about {topics_text}. What would you like to know?",
+                    f"Hi there! I'm here to assist with {topics_text}. How can I help you today?",
+                    f"Hello! I can provide information about {topics_text}. What can I help you with?"
+                ]
+                return random.choice(greetings)
+            else:
+                # Fallback if no topics found
+                return "Hello! I'm here to help answer your questions. What would you like to know?"
+        except Exception as e:
+            print(f"Error generating dynamic greeting: {e}")
+            return "Hello! I'm here to help answer your questions. What would you like to know?"
+    
+    def _get_available_topics(self) -> List[str]:
+        """Extract main topics from knowledge base"""
+        try:
+            # Get sample content from knowledge base
+            result = self.kb.supabase.table('knowledge_embeddings').select('content').limit(10).execute()
+            
+            topics = set()
+            for row in result.data:
+                content = row['content'][:200]  # First 200 chars
+                # Extract potential topics (simple approach)
+                sentences = content.split('.')[0:2]  # First 2 sentences
+                for sentence in sentences:
+                    words = sentence.split()
+                    # Look for topic-like phrases
+                    for i, word in enumerate(words):
+                        if word.lower() in ['about', 'regarding', 'for', 'how', 'what', 'when']:
+                            if i + 1 < len(words):
+                                topic_phrase = ' '.join(words[i+1:i+4])  # Next 3 words
+                                if len(topic_phrase) > 5:
+                                    topics.add(topic_phrase.lower().strip('.,!?'))
+            
+            # Clean and return topics
+            clean_topics = [topic for topic in topics if len(topic.split()) <= 3 and len(topic) > 3]
+            return list(clean_topics)[:5]  # Return max 5 topics
+            
+        except Exception as e:
+            print(f"Error extracting topics: {e}")
+            return []
     
     def _handle_handoff_response(self, message: str, session_key: str) -> Tuple[bool, str, float]:
         positive = ['yes', 'okay', 'ok', 'sure', 'please', 'yeah', 'connect me']
@@ -165,22 +210,24 @@ Answer:"""
             conversation_context = self._build_conversation_context(session_key)
             
             # Generate response
-            prompt = f"""You are a friendly customer support assistant. Answer naturally and conversationally.
+            prompt = f"""You are a friendly customer support assistant. Answer naturally and conversationally using ONLY the provided information.
 
 Recent conversation:
 {conversation_context}
 
-Knowledge base information:
+Available information:
 {knowledge_context}
 
 User question: {message}
 
 Instructions:
-- Answer using the knowledge base information when available
+- Answer ONLY using the provided information above
 - Be conversational and helpful
-- Don't mention "knowledge base" - speak naturally
+- Don't mention "knowledge base" or "information" - speak naturally
 - Keep responses concise but complete
-- If you don't have information about the topic, say "I don't have information about that. Would you like me to connect you with our support representative?"
+- If the provided information doesn't contain an answer to their question, say "I don't have information about that. Would you like me to connect you with our support representative?"
+- Do NOT make up information or use general knowledge
+- Do NOT mention business hours, return policy, order tracking, or password resets unless they are specifically in the provided information
 
 Response:"""
             
@@ -220,9 +267,9 @@ Response:"""
     def _generate_no_info_response(self) -> str:
         import random
         responses = [
-            "I don't have specific information about that. Would you like me to connect you with our support team?",
-            "That's not covered in my available information. Shall I connect you with a human agent?",
-            "I don't have details on that topic. Our support team can provide more help. Would you like me to connect you?"
+            "I don't have information about that. Would you like me to connect you with our support representative?",
+            "I don't have details on that topic. Would you like me to connect you with our support team?",
+            "That's not something I can help with. Shall I connect you with a human agent?"
         ]
         return random.choice(responses)
     
