@@ -538,8 +538,15 @@
                 showFeedbackSurvey();
             }, 2000);
         } else {
-            // Just clear and reset if no active session
-            clearConversation();
+            // End AI-only conversation and show feedback
+            addMessage('You ended the conversation', false, true);
+            sessionEnded = true;
+            document.getElementById('message-input').disabled = true;
+            document.getElementById('send-btn').disabled = true;
+            
+            setTimeout(() => {
+                showFeedbackSurvey();
+            }, 2000);
         }
     }
     
