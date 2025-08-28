@@ -46,14 +46,49 @@ class OdooClient:
             
         return False
     
+    def get_available_channels(self) -> list:
+        """Get all available live chat channels"""
+        try:
+            channel_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "im_livechat.channel",
+                    "method": "search_read",
+                    "args": [[], ["id", "name", "user_ids"]],
+                    "kwargs": {}
+                },
+                "id": 15
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=channel_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    channels = result['result']
+                    print(f"📋 Found {len(channels)} live chat channels:")
+                    for ch in channels:
+                        print(f"  - Channel {ch['id']}: {ch['name']} (operators: {len(ch.get('user_ids', []))})")
+                    return [ch['id'] for ch in channels]
+            
+            return [1, 2]  # Fallback
+            
+        except Exception as e:
+            print(f"Error getting channels: {e}")
+            return [1, 2]  # Fallback
+    
     def create_live_chat_session(self, visitor_name: str, message: str) -> Optional[int]:
         """Create a new live chat session in Odoo"""
         if not self.uid:
             if not self.authenticate():
                 return None
         
-        # Try channel ID 1 first, then 2
-        for channel_id in [1, 2]:
+        # Get all available channels dynamically
+        available_channels = self.get_available_channels()
+        
+        # Try each channel
+        for channel_id in available_channels:
             print(f"Attempting to create session for channel {channel_id} with visitor {visitor_name}")
             
             try:
@@ -96,7 +131,7 @@ class OdooClient:
                 print(f"Error with channel {channel_id}: {e}")
                 continue
         
-        print("❌ All channels failed")
+        print(f"❌ All {len(available_channels)} channels failed")
         return None
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
