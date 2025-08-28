@@ -139,19 +139,12 @@ async def handle_chat(chat_message: ChatMessage):
                 chat_message.visitor_name
             )
             
-            if success:
-                return ChatResponse(
-                    response="",
-                    handoff_needed=False,
-                    confidence=1.0,
-                    odoo_session_id=int(chat_message.session_id)
-                )
-            else:
-                return ChatResponse(
-                    response="SESSION_ENDED",
-                    handoff_needed=False,
-                    confidence=0.0
-                )
+            return ChatResponse(
+                response="",
+                handoff_needed=False,
+                confidence=1.0 if success else 0.0,
+                odoo_session_id=int(chat_message.session_id)
+            )
         
         # Process message with AI agent
         if not ai_agent:
