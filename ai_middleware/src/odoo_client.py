@@ -102,7 +102,8 @@ class OdooClient:
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
         """Send message as visitor with instant notification"""
         try:
-            if not self.is_session_active(session_id):
+            # Skip session check for system messages (like visitor ended conversation)
+            if author_name != "System" and not self.is_session_active(session_id):
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
@@ -467,7 +468,8 @@ class OdooClient:
             # Send final message
             self.send_message_to_session(session_id, message, "System")
             
-            # Close the session
+            # Close the session properly
+            from datetime import datetime
             close_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
@@ -475,8 +477,8 @@ class OdooClient:
                     "model": "discuss.channel",
                     "method": "write",
                     "args": [[session_id], {
-                        "livechat_status": "closed",
-                        "livechat_end_dt": "now"
+                        "livechat_status": "ended",
+                        "livechat_end_dt": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     }],
                     "kwargs": {}
                 },
@@ -534,7 +536,7 @@ class OdooClient:
                     attachment_id = result['result']
                     
                     # Send message with attachment
-                    message_body = message if message else f"📎 {file_name}"
+                    message_body = message if message else file_name
                     
                     message_data = {
                         "jsonrpc": "2.0",

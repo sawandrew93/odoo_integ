@@ -267,7 +267,7 @@
             if (response.ok && result.status === 'success') {
                 // Remove uploading message and show success
                 uploadMsgElement.remove();
-                const successMsg = message ? `${message} 📎 ${file.name}` : `📎 ${file.name}`;
+                const successMsg = message ? `${message} ${file.name}` : file.name;
                 addMessage(successMsg, true);
             } else {
                 uploadMsgElement.remove();
