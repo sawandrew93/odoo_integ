@@ -50,14 +50,6 @@ except Exception as e:
     print(f"Warning: AI Agent initialization failed: {e}")
     ai_agent = None
 
-# Load knowledge base on startup
-knowledge_dir = os.path.join(os.path.dirname(__file__), '..', 'knowledge')
-if ai_agent and os.path.exists(knowledge_dir):
-    try:
-        ai_agent.load_knowledge_base(knowledge_dir)
-    except Exception as e:
-        print(f"Warning: Failed to load knowledge base: {e}")
-
 # Initialize WebSocket manager
 ws_manager = WebSocketManager(odoo_client)
 
@@ -82,6 +74,9 @@ class LoginRequest(BaseModel):
 
 # Simple token storage (in production, use Redis or database)
 valid_tokens = set()
+
+# Global progress tracking
+upload_progress = {}
 
 def create_chunks(text, filename="", chunk_size=1000, overlap=200):
     """Create overlapping chunks from text using sentence boundaries"""

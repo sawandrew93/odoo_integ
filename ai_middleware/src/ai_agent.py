@@ -13,10 +13,6 @@ class AIAgent:
         self.system_message = "You are a customer support AI. Only answer questions based on the provided knowledge base. If you don't have the information, say you don't have it and offer to connect with a support representative."
         self.pending_handoff = {}
         self.conversation_history = {}
-        
-    def load_knowledge_base(self, directory: str):
-        """Load knowledge base from directory"""
-        self.kb.load_from_directory(directory)
     
     def should_handoff(self, message: str, context: str = "", session_id: str = None) -> Tuple[bool, str, float]:
         """Determine if message should be handed off to human agent"""
@@ -58,9 +54,9 @@ class AIAgent:
             self.conversation_history[session_key].append(f"AI: {response}")
             return False, response, 0.9
         
-        # Use AI to generate response based on knowledge base
+        # Use AI to generate response based on Supabase knowledge base
         try:
-            # Get relevant knowledge from knowledge base
+            # Get relevant knowledge from Supabase
             relevant_docs = self.kb.search(message, top_k=3)
             print(f"Found {len(relevant_docs)} relevant documents for: {message}")
             
