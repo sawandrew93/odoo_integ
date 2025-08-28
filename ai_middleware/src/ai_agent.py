@@ -32,12 +32,7 @@ class AIAgent:
             r'how\s+are\s+you'
         ]
         
-        self.handoff_patterns = [
-            r'\b(human|person|agent|representative|support\s+team)\b',
-            r'(talk|speak|connect)\s+to\s+(someone|human|person|agent|support)',
-            r'transfer\s+me',
-            r'not\s+helpful'
-        ]
+        # Removed regex patterns - now using AI for handoff detection
         
         self.frustration_patterns = [
             r'\b(frustrated|annoyed|angry|upset)\b',
@@ -63,8 +58,8 @@ class AIAgent:
         if current_state == ConversationState.PENDING_HANDOFF:
             return self._handle_handoff_response(message_lower, session_key)
         
-        # Check for explicit handoff requests
-        if self._is_handoff_request(message_lower):
+        # Use AI to detect handoff intent
+        if self._ai_detect_handoff_intent(message):
             response = "I'll connect you with one of our support representatives right away."
             self.conversation_history[session_key].append(f"AI: {response}")
             return True, response, 0.0
@@ -91,8 +86,33 @@ class AIAgent:
     def _is_greeting(self, message: str) -> bool:
         return any(re.search(pattern, message, re.IGNORECASE) for pattern in self.greeting_patterns)
     
-    def _is_handoff_request(self, message: str) -> bool:
-        return any(re.search(pattern, message, re.IGNORECASE) for pattern in self.handoff_patterns)
+    def _ai_detect_handoff_intent(self, message: str) -> bool:
+        """Use AI to intelligently detect handoff requests"""
+        try:
+            prompt = f"""Analyze this user message and determine if they want to talk to a human agent/support representative.
+
+User message: "{message}"
+
+Respond with only "YES" if they want human support, or "NO" if they don't.
+
+Examples:
+- "connect me with agent" → YES
+- "I want to talk to someone" → YES  
+- "please get me human help" → YES
+- "this is not working" → NO
+- "what are your hours" → NO
+- "how do I reset password" → NO
+
+Answer:"""
+            
+            response = self.model.generate_content(prompt)
+            result = response.text.strip().upper()
+            print(f"Handoff intent detection: '{message}' → {result}")
+            return result == "YES"
+        except Exception as e:
+            print(f"Error in AI handoff detection: {e}")
+            # Fallback to simple keyword check
+            return any(word in message.lower() for word in ['human', 'agent', 'support', 'connect me', 'talk to someone'])
     
     def _detect_frustration(self, message: str) -> bool:
         return any(re.search(pattern, message, re.IGNORECASE) for pattern in self.frustration_patterns)
@@ -160,11 +180,20 @@ Instructions:
 - Be conversational and helpful
 - Don't mention "knowledge base" - speak naturally
 - Keep responses concise but complete
+- If you don't have information about the topic, say "I don't have information about that. Would you like me to connect you with our support representative?"
 
 Response:"""
             
             ai_response = self.model.generate_content(prompt)
             response = ai_response.text.strip()
+            
+            # Check if AI says it doesn't have information and offer handoff
+            if any(phrase in response.lower() for phrase in ["don't have", "no information", "not sure", "can't help"]):
+                if "connect" not in response.lower():
+                    response += " Would you like me to connect you with our support representative?"
+                self.conversation_states[session_key] = ConversationState.PENDING_HANDOFF
+                self.conversation_history[session_key].append(f"AI: {response}")
+                return False, response, 0.3
             
             # Post-process response
             response = re.sub(r'\bknowledge base\b', 'our information', response, flags=re.IGNORECASE)

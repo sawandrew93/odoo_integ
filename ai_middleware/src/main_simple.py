@@ -157,10 +157,12 @@ async def handle_chat(chat_message: ChatMessage):
                 chat_message.context,
                 chat_message.session_id
             )
+            print(f"AI Agent response - handoff_needed: {handoff_needed}, confidence: {confidence}, response: {ai_response[:100]}...")
         
         odoo_session_id = None
         
         if handoff_needed:
+            print(f"Handoff requested - creating Odoo session for visitor: {chat_message.visitor_name}")
             # Send only the current request to keep it clean and readable
             full_message = chat_message.message
             
@@ -168,6 +170,8 @@ async def handle_chat(chat_message: ChatMessage):
                 visitor_name=chat_message.visitor_name,
                 message=full_message
             )
+            
+            print(f"Odoo session creation result: {odoo_session_id}")
             
             if odoo_session_id:
                 ai_response = f"I've connected you with a human agent (Session #{odoo_session_id}). Please wait for their response."
