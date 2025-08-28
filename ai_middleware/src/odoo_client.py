@@ -265,7 +265,9 @@ class OdooClient:
                             ["res_id", "=", session_id], 
                             ["model", "=", "discuss.channel"],
                             ["id", ">", last_message_id],
-                            ["author_id", "!=", False]
+                            ["author_id", "!=", False],
+                            ["message_type", "=", "comment"],
+                            ["subtype_id.name", "!=", "Note"]
                         ], ["id", "body", "author_id", "date", "email_from", "attachment_ids", "message_type", "subtype_id"]],
                         "kwargs": {"order": "date asc", "limit": 5}
                     },
@@ -279,8 +281,13 @@ class OdooClient:
                     
                     if result.get('result'):
                         for msg in result['result']:
-                            # Skip visitor messages
+                            # Skip visitor messages and feedback messages
                             if not (msg.get('email_from') and 'visitor@livechat.com' in msg['email_from']):
+                                # Skip feedback messages (internal notes)
+                                if 'Customer Feedback:' in msg.get('body', ''):
+                                    last_message_id = max(last_message_id, msg['id'])
+                                    continue
+                                    
                                 import re
                                 clean_body = re.sub(r'<[^>]+>', '', msg['body'])
                                 author_name = msg['author_id'][1] if isinstance(msg['author_id'], list) else 'Agent'
