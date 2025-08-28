@@ -491,7 +491,7 @@
 
     window.closeSurvey = function() {
         const survey = document.querySelector('#chat-messages div[style*="background: white"]');
-        if (survey && survey.innerHTML.includes('Rate this conversation')) {
+        if (survey && (survey.innerHTML.includes('Rate this conversation') || survey.innerHTML.includes('Conversation ended'))) {
             survey.remove();
         }
         selectedRating = 0;

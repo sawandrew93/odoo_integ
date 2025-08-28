@@ -468,18 +468,14 @@ class OdooClient:
             # Send final message
             self.send_message_to_session(session_id, message, "System")
             
-            # Close the session properly
-            from datetime import datetime
+            # Close the session using Odoo's proper method
             close_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "model": "discuss.channel",
-                    "method": "write",
-                    "args": [[session_id], {
-                        "livechat_status": "ended",
-                        "livechat_end_dt": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    }],
+                    "model": "im_livechat.channel",
+                    "method": "close_session",
+                    "args": [session_id],
                     "kwargs": {}
                 },
                 "id": 13
