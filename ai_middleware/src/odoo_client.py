@@ -115,8 +115,10 @@ class OdooClient:
                         
                         if result.get('result') and result['result'] != False:
                             session_data = result['result']
-                            session_id = session_data.get('channel_id')
-                            if session_id:
+                            # Extract session ID from discuss.channel array
+                            channels = session_data.get('discuss.channel', [])
+                            if channels and len(channels) > 0:
+                                session_id = channels[0]['id']
                                 print(f"✅ Live chat session created! ID: {session_id}")
                                 # Send the initial message as visitor
                                 self.send_message_to_session(session_id, message, visitor_name)
