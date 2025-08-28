@@ -92,36 +92,21 @@ class OdooClient:
             print(f"Attempting to create session for channel {channel_id} with visitor {visitor_name}")
             
             try:
-                # Try public endpoint first (no auth needed)
-                init_data = {
+                rpc_data = {
                     "jsonrpc": "2.0",
                     "method": "call",
                     "params": {
                         "channel_id": channel_id,
-                        "anonymous_name": visitor_name
+                        "anonymous_name": visitor_name,
+                        "previous_operator_id": False,
+                        "country_id": False,
+                        "user_id": False,
+                        "persisted": True
                     },
                     "id": 2
                 }
                 
-                response = self.session.post(f"{self.url}/im_livechat/init", json=init_data)
-                
-                # If init fails, try original method
-                if response.status_code != 200:
-                    rpc_data = {
-                        "jsonrpc": "2.0",
-                        "method": "call",
-                        "params": {
-                            "channel_id": channel_id,
-                            "anonymous_name": visitor_name,
-                            "previous_operator_id": False,
-                            "country_id": False,
-                            "user_id": False,
-                            "persisted": True
-                        },
-                        "id": 2
-                    }
-                    
-                    response = self.session.post(f"{self.url}/im_livechat/get_session", json=rpc_data)
+                response = self.session.post(f"{self.url}/im_livechat/get_session", json=rpc_data)
                 
                 if response.status_code == 200:
                     try:
@@ -130,11 +115,31 @@ class OdooClient:
                         
                         if result.get('result') and result['result'] != False:
                             session_data = result['result']
+                            
                             # Extract session ID from discuss.channel array
                             channels = session_data.get('discuss.channel', [])
                             if channels and len(channels) > 0:
                                 session_id = channels[0]['id']
                                 print(f"✅ Live chat session created! ID: {session_id}")
+                                
+                                # Transfer session ownership to system user (OdooBot)
+                                try:
+                                    transfer_data = {
+                                        "jsonrpc": "2.0",
+                                        "method": "call",
+                                        "params": {
+                                            "model": "discuss.channel",
+                                            "method": "write",
+                                            "args": [[session_id], {"create_uid": 1}],  # System user
+                                            "kwargs": {}
+                                        },
+                                        "id": 16
+                                    }
+                                    self.session.post(f"{self.url}/web/dataset/call_kw", json=transfer_data)
+                                    print(f"⚙️ Transferred session {session_id} ownership to system user")
+                                except Exception as e:
+                                    print(f"Warning: Could not transfer ownership: {e}")
+                                
                                 # Send the initial message as visitor
                                 self.send_message_to_session(session_id, message, visitor_name)
                                 return session_id
