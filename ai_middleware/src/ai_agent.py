@@ -1,7 +1,15 @@
 import os
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 import google.generativeai as genai
 from .knowledge_base import KnowledgeBase
+import re
+from enum import Enum
+
+class ConversationState(Enum):
+    GREETING = "greeting"
+    HELPING = "helping"
+    PENDING_HANDOFF = "pending_handoff"
+    ESCALATED = "escalated"
 
 class AIAgent:
     def __init__(self, api_key: str, confidence_threshold: float = 0.7, supabase_url: str = None, supabase_key: str = None):
@@ -10,99 +18,190 @@ class AIAgent:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
         self.kb = KnowledgeBase(api_key, supabase_url, supabase_key)
-        self.system_message = "You are a customer support AI. Only answer questions based on the provided knowledge base. If you don't have the information, say you don't have it and offer to connect with a support representative."
-        self.pending_handoff = {}
+        
+        self.system_message = """You are a friendly customer support assistant. Be conversational and helpful while answering questions using only the provided knowledge base content."""
+        
+        self.conversation_states = {}
         self.conversation_history = {}
+        self.user_context = {}
+        
+        # Enhanced patterns
+        self.greeting_patterns = [
+            r'\b(hi|hello|hey|good\s+(morning|afternoon|evening))\b',
+            r'^(hi|hello|hey)$',
+            r'how\s+are\s+you'
+        ]
+        
+        self.handoff_patterns = [
+            r'\b(human|person|agent|representative|support\s+team)\b',
+            r'(talk|speak|connect)\s+to\s+(someone|human|person|agent|support)',
+            r'transfer\s+me',
+            r'not\s+helpful'
+        ]
+        
+        self.frustration_patterns = [
+            r'\b(frustrated|annoyed|angry|upset)\b',
+            r'this\s+(sucks|is\s+terrible|doesn\'t\s+work)',
+            r'waste\s+of\s+time'
+        ]
     
     def should_handoff(self, message: str, context: str = "", session_id: str = None) -> Tuple[bool, str, float]:
-        """Determine if message should be handed off to human agent"""
+        """Enhanced decision making for handoffs with better context awareness"""
         message_lower = message.lower().strip()
         session_key = session_id or 'default'
         
-        # Track conversation history
+        # Initialize session data
         if session_key not in self.conversation_history:
             self.conversation_history[session_key] = []
-        self.conversation_history[session_key].append(f"Visitor: {message}")
+            self.conversation_states[session_key] = ConversationState.GREETING
+            self.user_context[session_key] = {'attempts': 0, 'topics': set()}
         
-        # Check if user is responding to handoff offer
-        if session_key in self.pending_handoff:
-            if any(word in message_lower for word in ['yes', 'okay', 'ok', 'sure', 'please']):
-                del self.pending_handoff[session_key]
-                response = "Connecting you with a human agent now..."
-                self.conversation_history[session_key].append(f"AI: {response}")
-                return True, response, 0.0
-            elif any(word in message_lower for word in ['no', 'not now', 'later']):
-                del self.pending_handoff[session_key]
-                response = "No problem! How else can I help you?"
-                self.conversation_history[session_key].append(f"AI: {response}")
-                return False, response, 0.9
+        self.conversation_history[session_key].append(f"User: {message}")
+        current_state = self.conversation_states[session_key]
         
-        # Check for explicit human agent requests
-        human_keywords = ['talk to support', 'speak to support', 'human agent', 'live agent', 'representative', 'talk to someone', 'speak to person', 'connect me', 'pls connect', 'talk to agent']
-        if any(keyword in message_lower for keyword in human_keywords) or ('support' in message_lower and ('talk' in message_lower or 'speak' in message_lower)) or ('agent' in message_lower and ('talk' in message_lower or 'speak' in message_lower)):
-            response = "I'll connect you with a human agent."
+        # Handle pending handoff responses
+        if current_state == ConversationState.PENDING_HANDOFF:
+            return self._handle_handoff_response(message_lower, session_key)
+        
+        # Check for explicit handoff requests
+        if self._is_handoff_request(message_lower):
+            response = "I'll connect you with one of our support representatives right away."
             self.conversation_history[session_key].append(f"AI: {response}")
             return True, response, 0.0
         
-        # Handle basic greetings only
-        if any(word in message_lower for word in ['hi', 'hello', 'hey']) and len(message.split()) <= 2:
-            response = "Hello! How can I help you today?"
-            self.conversation_history[session_key].append(f"AI: {response}")
-            return False, response, 0.9
-        elif 'how are you' in message_lower:
-            response = "I'm doing well, thank you! How can I assist you today?"
-            self.conversation_history[session_key].append(f"AI: {response}")
-            return False, response, 0.9
+        # Check for frustration and auto-escalate
+        if self._detect_frustration(message_lower):
+            self.user_context[session_key]['attempts'] += 1
+            if self.user_context[session_key]['attempts'] >= 2:
+                response = "I understand this might be frustrating. Let me connect you with our support team who can better assist you."
+                self.conversation_states[session_key] = ConversationState.ESCALATED
+                self.conversation_history[session_key].append(f"AI: {response}")
+                return True, response, 0.0
         
-        # Use AI to generate response based on Supabase knowledge base
+        # Handle greetings
+        if self._is_greeting(message_lower) and current_state == ConversationState.GREETING:
+            response = self._generate_greeting_response()
+            self.conversation_states[session_key] = ConversationState.HELPING
+            self.conversation_history[session_key].append(f"AI: {response}")
+            return False, response, 0.95
+        
+        # Generate AI response for questions
+        return self._generate_ai_response(message, session_key)
+    
+    def _is_greeting(self, message: str) -> bool:
+        return any(re.search(pattern, message, re.IGNORECASE) for pattern in self.greeting_patterns)
+    
+    def _is_handoff_request(self, message: str) -> bool:
+        return any(re.search(pattern, message, re.IGNORECASE) for pattern in self.handoff_patterns)
+    
+    def _detect_frustration(self, message: str) -> bool:
+        return any(re.search(pattern, message, re.IGNORECASE) for pattern in self.frustration_patterns)
+    
+    def _generate_greeting_response(self) -> str:
+        import random
+        greetings = [
+            "Hello! I'm here to help you with any questions you might have. What can I assist you with today?",
+            "Hi there! How can I help you today?",
+            "Hello! I'm your AI assistant. What would you like to know?"
+        ]
+        return random.choice(greetings)
+    
+    def _handle_handoff_response(self, message: str, session_key: str) -> Tuple[bool, str, float]:
+        positive = ['yes', 'okay', 'ok', 'sure', 'please', 'yeah', 'connect me']
+        negative = ['no', 'not now', 'later', 'continue']
+        
+        if any(word in message for word in positive):
+            self.conversation_states[session_key] = ConversationState.ESCALATED
+            response = "Perfect! I'm connecting you with a human agent now."
+            self.conversation_history[session_key].append(f"AI: {response}")
+            return True, response, 0.0
+        elif any(word in message for word in negative):
+            self.conversation_states[session_key] = ConversationState.HELPING
+            response = "No problem! I'm still here to help. What else can I assist you with?"
+            self.conversation_history[session_key].append(f"AI: {response}")
+            return False, response, 0.9
+        else:
+            response = "Would you like me to connect you with a human agent? Please say 'yes' to connect or 'no' to continue."
+            self.conversation_history[session_key].append(f"AI: {response}")
+            return False, response, 0.5
+    
+    def _generate_ai_response(self, message: str, session_key: str) -> Tuple[bool, str, float]:
         try:
-            # Get relevant knowledge from Supabase
-            relevant_docs = self.kb.search(message, top_k=3)
+            # Search knowledge base
+            relevant_docs = self.kb.search(message, top_k=5)
             print(f"Found {len(relevant_docs)} relevant documents for: {message}")
             
-            # Create context from knowledge base
-            context = "\n".join([doc['content'] for doc in relevant_docs]) if relevant_docs else ""
-            print(f"Context length: {len(context)} characters")
+            # Calculate confidence based on document relevance
+            confidence = self._calculate_confidence(relevant_docs)
             
-            # Create AI prompt with better instructions
-            prompt = f"""
-You are a helpful customer support assistant. Answer the user's question using ONLY the provided knowledge base content.
+            if confidence < 0.3 or not relevant_docs:
+                response = self._generate_no_info_response()
+                self.conversation_states[session_key] = ConversationState.PENDING_HANDOFF
+                self.conversation_history[session_key].append(f"AI: {response}")
+                return False, response, confidence
+            
+            # Build context
+            knowledge_context = "\n\n".join([doc['content'] for doc in relevant_docs])
+            conversation_context = self._build_conversation_context(session_key)
+            
+            # Generate response
+            prompt = f"""You are a friendly customer support assistant. Answer naturally and conversationally.
 
-Knowledge Base Content:
-{context}
+Recent conversation:
+{conversation_context}
 
-User Question: {message}
+Knowledge base information:
+{knowledge_context}
+
+User question: {message}
 
 Instructions:
-- If the knowledge base contains information that answers the question, provide a detailed answer using that content
-- Quote or paraphrase the relevant information from the knowledge base
-- If the user asks what you can help with, mention the topics covered in the knowledge base
-- If no relevant information is found in the knowledge base, respond with: "I don't have information about that. I can connect you with our support representative if you want."
-- Do not make up information not in the knowledge base
-- Be helpful and specific
+- Answer using the knowledge base information when available
+- Be conversational and helpful
+- Don't mention "knowledge base" - speak naturally
+- Keep responses concise but complete
 
-Answer:"""
+Response:"""
             
-            # Generate response using Gemini
             ai_response = self.model.generate_content(prompt)
             response = ai_response.text.strip()
             
-            # Check if AI says it doesn't have information
-            if "don't have information" in response.lower():
-                self.pending_handoff[session_key] = True
-                self.conversation_history[session_key].append(f"AI: {response}")
-                return False, response, 0.3
-            else:
-                self.conversation_history[session_key].append(f"AI: {response}")
-                return False, response, 0.9
-                
+            # Post-process response
+            response = re.sub(r'\bknowledge base\b', 'our information', response, flags=re.IGNORECASE)
+            
+            self.conversation_history[session_key].append(f"AI: {response}")
+            return False, response, confidence
+            
         except Exception as e:
             print(f"AI generation error: {e}")
-            # Fallback to handoff offer
-            self.pending_handoff[session_key] = True
-            response = "I don't have information about that. I can connect you with our support representative if you want."
+            response = "I'm having trouble right now. Would you like me to connect you with our support team?"
+            self.conversation_states[session_key] = ConversationState.PENDING_HANDOFF
             self.conversation_history[session_key].append(f"AI: {response}")
-            return False, response, 0.3
+            return False, response, 0.2
+    
+    def _calculate_confidence(self, relevant_docs: List[dict]) -> float:
+        if not relevant_docs:
+            return 0.0
+        max_score = max(doc.get('score', 0) for doc in relevant_docs)
+        normalized_score = (max_score + 1) / 2
+        if len(relevant_docs) >= 3 and normalized_score > 0.6:
+            normalized_score = min(0.95, normalized_score + 0.1)
+        return normalized_score
+    
+    def _generate_no_info_response(self) -> str:
+        import random
+        responses = [
+            "I don't have specific information about that. Would you like me to connect you with our support team?",
+            "That's not covered in my available information. Shall I connect you with a human agent?",
+            "I don't have details on that topic. Our support team can provide more help. Would you like me to connect you?"
+        ]
+        return random.choice(responses)
+    
+    def _build_conversation_context(self, session_key: str) -> str:
+        if session_key in self.conversation_history:
+            recent_history = self.conversation_history[session_key][-4:]
+            return "\n".join(recent_history)
+        return ""
     
     def get_conversation_history(self, session_id: str = None) -> str:
         """Get formatted conversation history for a session"""
@@ -110,4 +209,21 @@ Answer:"""
         if session_key in self.conversation_history:
             return "\n".join(self.conversation_history[session_key])
         return ""
+    
+    def get_conversation_summary(self, session_id: str = None) -> Dict:
+        """Get comprehensive conversation summary"""
+        session_key = session_id or 'default'
+        return {
+            'history': self.get_conversation_history(session_key),
+            'state': self.conversation_states.get(session_key, ConversationState.GREETING).value,
+            'context': self.user_context.get(session_key, {}),
+            'message_count': len(self.conversation_history.get(session_key, []))
+        }
+    
+    def reset_session(self, session_id: str = None):
+        """Reset conversation state for a session"""
+        session_key = session_id or 'default'
+        for storage in [self.conversation_history, self.conversation_states, self.user_context]:
+            if session_key in storage:
+                del storage[session_key]
         
