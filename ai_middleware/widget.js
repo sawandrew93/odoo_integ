@@ -16,7 +16,7 @@
             <div id="chat-container" style="position:fixed;bottom:20px;right:20px;width:60px;height:60px;border:none;border-radius:50%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;flex-direction:column;z-index:9999;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;transition:all 0.3s ease;overflow:hidden;">
                 <div id="chat-header" style="padding:0;background:transparent;color:white;font-weight:600;cursor:pointer;display:flex;justify-content:center;align-items:center;flex-shrink:0;width:100%;height:100%;position:relative;">
                     <span style="font-size:24px;">💬</span>
-                    <div id="menu-btn" style="position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.2);display:none;align-items:center;justify-content:center;cursor:pointer;font-size:12px;" onclick="event.stopPropagation();toggleMenu();">⋯</div>
+                    <div id="menu-btn" style="position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.2);display:none;align-items:center;justify-content:center;cursor:pointer;font-size:12px;" onclick="event.stopPropagation();toggleMenu();">⋮</div>
                 </div>
                 <div id="chat-body" style="flex:1;display:none;flex-direction:column;background:white;min-height:0;">
                     <div id="chat-messages" style="flex:1;padding:20px;overflow-y:auto;background:linear-gradient(to bottom,#f8f9fa,#ffffff);min-height:0;"></div>
@@ -24,13 +24,13 @@
                         <div style="display:flex;gap:8px;align-items:end;">
                             <input type="text" id="message-input" placeholder="Type your message..." style="flex:1;padding:12px 16px;border:2px solid #e9ecef;border-radius:25px;outline:none;font-size:14px;transition:border-color 0.2s ease;">
                             <input type="file" id="file-input" style="display:none;" accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.zip,.mp3,.wav,.ogg,.mp4,.avi,.mov">
-                            <button id="attach-btn" style="padding:12px;background:#f8f9fa;color:#666;border:1px solid #e9ecef;border-radius:50%;cursor:pointer;font-size:16px;width:48px;height:48px;display:none;" title="Attach file">📎</button>
+                            <button id="attach-btn" style="padding:12px;background:#f8f9fa;color:#666;border:1px solid #e9ecef;border-radius:50%;cursor:pointer;font-size:16px;width:48px;height:48px;display:none;" title="Attach file">📄</button>
                             <button id="send-btn" style="padding:12px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:25px;cursor:pointer;font-weight:600;transition:transform 0.2s ease;min-width:60px;">Send</button>
                         </div>
                     </div>
                     <div id="menu-dropdown" style="position:absolute;top:60px;right:20px;background:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);border:1px solid #e9ecef;min-width:160px;display:none;z-index:10000;">
-                        <div onclick="clearConversation()" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid #f1f3f4;color:#333;font-size:14px;transition:background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">🗑️ Clear conversation</div>
-                        <div onclick="endConversation()" style="padding:12px 16px;cursor:pointer;color:#dc3545;font-size:14px;transition:background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">❌ End conversation</div>
+                        <div onclick="clearConversation()" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid #f1f3f4;color:#333;font-size:14px;transition:background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">⌫ Clear conversation</div>
+                        <div onclick="endConversation()" style="padding:12px 16px;cursor:pointer;color:#dc3545;font-size:14px;transition:background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">⏹ End conversation</div>
                     </div>
                 </div>
             </div>
@@ -339,7 +339,11 @@
         .attachment-item:hover { background: rgba(255,255,255,0.15) !important; }
         #menu-btn:hover { background: rgba(255,255,255,0.3) !important; }
         @media (max-width: 480px) {
-            #chat-container.maximized { width: calc(100vw - 40px) !important; height: calc(100vh - 40px) !important; bottom: 20px !important; right: 20px !important; left: 20px !important; }
+            #chat-container.maximized { width: calc(100vw - 20px) !important; height: calc(100vh - 80px) !important; bottom: 10px !important; right: 10px !important; left: 10px !important; }
+            #chat-container { bottom: 10px !important; right: 10px !important; }
+        }
+        @media (max-width: 360px) {
+            #chat-container.maximized { width: calc(100vw - 10px) !important; height: calc(100vh - 60px) !important; bottom: 5px !important; right: 5px !important; left: 5px !important; }
         }
     `;
     document.head.appendChild(style);
@@ -413,24 +417,24 @@
         surveyDiv.style.cssText = 'background: white; padding: 20px; border-radius: 12px; margin: 15px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #e0e0e0; text-align: center;';
         
         surveyDiv.innerHTML = `
-            <div style="margin-bottom: 15px; text-align: center;">
-                <div style="font-size: 32px; margin-bottom: 10px;">💬</div>
-                <h3 style="margin: 0 0 8px 0; font-size: 18px; color: #333; font-weight: 600;">Conversation ended</h3>
-                <p style="margin: 0; font-size: 14px; color: #666;">Please rate the quality of this conversation</p>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 50%; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">✓</div>
+                <h3 style="margin: 0 0 6px 0; font-size: 16px; color: #2c3e50; font-weight: 600;">Conversation Complete</h3>
+                <p style="margin: 0; font-size: 13px; color: #7f8c8d; line-height: 1.4;">How would you rate your experience?</p>
             </div>
-            <div style="display: flex; justify-content: center; gap: 5px; margin-bottom: 15px;" id="star-rating">
-                <span class="rating-star" data-rating="1" style="font-size: 28px; cursor: pointer; color: #ddd; transition: color 0.2s;">★</span>
-                <span class="rating-star" data-rating="2" style="font-size: 28px; cursor: pointer; color: #ddd; transition: color 0.2s;">★</span>
-                <span class="rating-star" data-rating="3" style="font-size: 28px; cursor: pointer; color: #ddd; transition: color 0.2s;">★</span>
-                <span class="rating-star" data-rating="4" style="font-size: 28px; cursor: pointer; color: #ddd; transition: color 0.2s;">★</span>
-                <span class="rating-star" data-rating="5" style="font-size: 28px; cursor: pointer; color: #ddd; transition: color 0.2s;">★</span>
+            <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 16px; padding: 0 10px;" id="star-rating">
+                <span class="rating-star" data-rating="1" style="font-size: 24px; cursor: pointer; color: #e0e0e0; transition: all 0.2s ease;">★</span>
+                <span class="rating-star" data-rating="2" style="font-size: 24px; cursor: pointer; color: #e0e0e0; transition: all 0.2s ease;">★</span>
+                <span class="rating-star" data-rating="3" style="font-size: 24px; cursor: pointer; color: #e0e0e0; transition: all 0.2s ease;">★</span>
+                <span class="rating-star" data-rating="4" style="font-size: 24px; cursor: pointer; color: #e0e0e0; transition: all 0.2s ease;">★</span>
+                <span class="rating-star" data-rating="5" style="font-size: 24px; cursor: pointer; color: #e0e0e0; transition: all 0.2s ease;">★</span>
             </div>
-            <textarea id="feedback-comment" placeholder="Leave a comment (optional)" style="width: calc(100% - 16px); height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: none; font-family: inherit; margin-bottom: 15px; font-size: 14px;"></textarea>
-            <div style="display: flex; justify-content: center; gap: 10px;">
-                <button onclick="submitFeedback()" style="padding: 8px 16px; background: #00a65a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500;">
-                    Send
+            <textarea id="feedback-comment" placeholder="Share your thoughts (optional)" style="width: calc(100% - 20px); height: 50px; padding: 10px; border: 1px solid #e1e8ed; border-radius: 8px; resize: none; font-family: inherit; margin-bottom: 16px; font-size: 13px; background: #fafbfc; outline: none; transition: border-color 0.2s;"></textarea>
+            <div style="display: flex; gap: 8px;">
+                <button onclick="submitFeedback()" style="flex: 1; padding: 10px 16px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                    Submit
                 </button>
-                <button onclick="closeSurvey()" style="padding: 8px 16px; background: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                <button onclick="closeSurvey()" style="flex: 1; padding: 10px 16px; background: #f8f9fa; color: #6c757d; border: 1px solid #e9ecef; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.2s;" onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">
                     Skip
                 </button>
             </div>
@@ -449,7 +453,8 @@
         selectedRating = rating;
         const stars = document.querySelectorAll('.rating-star');
         stars.forEach((star, index) => {
-            star.style.color = index < rating ? '#ffc107' : '#ddd';
+            star.style.color = index < rating ? '#ffd700' : '#e0e0e0';
+            star.style.transform = index < rating ? 'scale(1.1)' : 'scale(1)';
         });
     }
     
