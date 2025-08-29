@@ -60,7 +60,7 @@ class AIAgent:
         
         # Use AI to detect handoff intent
         if self._ai_detect_handoff_intent(message):
-            response = "I'll connect you with one of our support representatives right away.\n\n<b>Need more help? I can connect you with a Vanguard support representative anytime.</b>"
+            response = "I'll connect you with one of our support representatives right away.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n💬 Need more help? I can connect you with a Vanguard support representative anytime."
             self.conversation_history[session_key].append(f"AI: {response}")
             return True, response, 0.0
         
@@ -68,7 +68,7 @@ class AIAgent:
         if self._detect_frustration(message_lower):
             self.user_context[session_key]['attempts'] += 1
             if self.user_context[session_key]['attempts'] >= 2:
-                response = "I understand this might be frustrating. Let me connect you with our support team who can better assist you.\n\n<b>Need more help? I can connect you with a Vanguard support representative anytime.</b>"
+                response = "I understand this might be frustrating. Let me connect you with our support team who can better assist you.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n💬 Need more help? I can connect you with a Vanguard support representative anytime."
                 self.conversation_states[session_key] = ConversationState.ESCALATED
                 self.conversation_history[session_key].append(f"AI: {response}")
                 return True, response, 0.0
@@ -246,7 +246,7 @@ Response:"""
             response = re.sub(r'\bknowledge base\b', 'our information', response, flags=re.IGNORECASE)
             
             # Add Vanguard support offer to all AI responses
-            response += "\n\n<b>Need more help? I can connect you with a Vanguard support representative anytime.</b>"
+            response += "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n💬 Need more help? I can connect you with a Vanguard support representative anytime."
             
             self.conversation_history[session_key].append(f"AI: {response}")
             return False, response, confidence
