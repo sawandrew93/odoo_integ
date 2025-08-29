@@ -447,6 +447,36 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "AI Middleware"}
 
+@app.get("/debug/auth")
+async def debug_auth():
+    """Test Odoo authentication"""
+    try:
+        auth_success = odoo_client.authenticate()
+        return {
+            "auth_success": auth_success,
+            "uid": odoo_client.uid,
+            "url": odoo_client.url,
+            "db": odoo_client.db,
+            "has_username": bool(getattr(odoo_client, 'username', None))
+        }
+    except Exception as e:
+        return {"error": f"Auth test failed: {str(e)}"}
+
+@app.post("/debug/create-session")
+async def debug_create_session():
+    """Test creating a live chat session"""
+    try:
+        session_id = odoo_client.create_live_chat_session(
+            visitor_name="Test Visitor",
+            message="Test message from debug endpoint"
+        )
+        return {
+            "session_created": session_id is not None,
+            "session_id": session_id
+        }
+    except Exception as e:
+        return {"error": f"Session creation failed: {str(e)}"}
+
 @app.post("/upload-file")
 async def upload_file_to_session(
     file: UploadFile = File(...),
