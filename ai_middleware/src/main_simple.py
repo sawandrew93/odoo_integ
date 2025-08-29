@@ -458,7 +458,10 @@ async def debug_auth():
             "uid": odoo_client.uid,
             "url": odoo_client.url,
             "db": odoo_client.db,
-            "has_username": bool(getattr(odoo_client, 'username', None))
+            "has_username": bool(getattr(odoo_client, 'username', None)),
+            "env_username": os.getenv('ODOO_USERNAME'),
+            "env_password": "***" if os.getenv('ODOO_PASSWORD') else None,
+            "env_api_key": "***" if os.getenv('ODOO_API_KEY') else None
         }
     except Exception as e:
         return {"error": f"Auth test failed: {str(e)}"}
