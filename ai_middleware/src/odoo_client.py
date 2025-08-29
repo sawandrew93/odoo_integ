@@ -176,20 +176,19 @@ class OdooClient:
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "model": "discuss.channel",
-                    "method": "message_post",
-                    "args": [session_id],
-                    "kwargs": {
+                    "service": "object",
+                    "method": "execute_kw",
+                    "args": [self.db, self.uid, self.api_key, "discuss.channel", "message_post", [session_id], {
                         "body": message,
                         "message_type": "comment",
                         "author_id": False,
                         "email_from": f"{author_name} <visitor@livechat.com>"
-                    }
+                    }]
                 },
                 "id": 3
             }
             
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            response = self.session.post(f"{self.url}/jsonrpc", json=message_data)
             print(f"Initial message response status: {response.status_code}")
             
             if response.status_code == 200:
