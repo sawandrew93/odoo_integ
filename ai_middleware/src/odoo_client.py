@@ -21,22 +21,27 @@ class OdooClient:
         })
         
     def authenticate(self) -> bool:
-        """Authenticate with Odoo using API key only"""
+        """Authenticate with Odoo using API key"""
         
         if not self.api_key:
             print("❌ No API key provided")
             return False
             
+        # For API key authentication, we need the username from environment
+        username = os.getenv('ODOO_USERNAME')
+        if not username:
+            print("❌ Username required for API key authentication")
+            return False
+            
         try:
-            # Try different API key authentication methods
-            # Method 1: Direct API key as login
+            # Odoo API key authentication: username as login, API key as password
             auth_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
                     "service": "common",
                     "method": "authenticate",
-                    "args": [self.db, self.api_key, self.api_key, {}]
+                    "args": [self.db, username, self.api_key, {}]
                 },
                 "id": 1
             }
@@ -46,7 +51,7 @@ class OdooClient:
             
             print(f"API key auth response: {result}")
             
-            if response.status_code == 200 and result.get('result'):
+            if response.status_code == 200 and result.get('result') and result['result'] != False:
                 self.uid = result['result']
                 print(f"✅ API key authentication successful, UID: {self.uid}")
                 return True
