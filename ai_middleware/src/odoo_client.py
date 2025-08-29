@@ -149,8 +149,8 @@ class OdooClient:
                             if session_id:
                                 print(f"✅ Live chat session created! ID: {session_id}")
                                 
-                                # Send the initial message as visitor
-                                self.send_message_to_session(session_id, message, visitor_name)
+                                # Send the initial message as visitor (skip session check for new sessions)
+                                self._send_initial_message(session_id, message, visitor_name)
                                 return session_id
                             else:
                                 print(f"❌ Could not extract session ID from response")
@@ -168,10 +168,46 @@ class OdooClient:
         print(f"❌ All {len(available_channels)} channels failed")
         return None
     
+    def _send_initial_message(self, session_id: int, message: str, author_name: str) -> bool:
+        """Send initial message to newly created session (skips active check)"""
+        try:
+            message_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "message_post",
+                    "args": [session_id],
+                    "kwargs": {
+                        "body": message,
+                        "message_type": "comment",
+                        "author_id": False,
+                        "email_from": f"{author_name} <visitor@livechat.com>"
+                    }
+                },
+                "id": 3
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    message_id = result['result']
+                    print(f"✅ Initial message sent to session {session_id}, ID: {message_id}")
+                    return True
+            
+            print(f"❌ Failed to send initial message to session {session_id}")
+            return False
+            
+        except Exception as e:
+            print(f"Error sending initial message: {e}")
+            return False
+    
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
         """Send message as visitor with instant notification"""
         try:
-            # Skip session check for system messages (like visitor ended conversation)
+            # Skip session check for system messages
             if author_name != "System" and not self.is_session_active(session_id):
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
