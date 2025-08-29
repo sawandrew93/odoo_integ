@@ -28,32 +28,33 @@ class OdooClient:
             return False
             
         try:
-            # For Odoo Online, API key goes in X-Openerp-Session-Id header
-            headers = {
-                'Content-Type': 'application/json',
-                'X-Openerp-Session-Id': self.api_key
-            }
-            
-            # Test API key with a simple call
+            # Odoo 18 API key authentication via /jsonrpc endpoint
             test_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "model": "res.users",
-                    "method": "search_read",
-                    "args": [["id", "=", 1]], 
-                    "kwargs": {"fields": ["id"], "limit": 1}
+                    "service": "object",
+                    "method": "execute_kw",
+                    "args": [
+                        self.db,
+                        None,  # uid not needed for API key
+                        self.api_key,  # API key as password
+                        "res.users",
+                        "search_read",
+                        [["id", "=", 1]],
+                        {"fields": ["id"], "limit": 1}
+                    ]
                 },
                 "id": 1
             }
             
-            response = requests.post(f"{self.url}/web/dataset/call_kw", json=test_data, headers=headers)
+            response = self.session.post(f"{self.url}/jsonrpc", json=test_data)
             result = response.json()
             
-            if response.status_code == 200 and not result.get('error'):
+            print(f"API key test response: {result}")
+            
+            if response.status_code == 200 and result.get('result'):
                 self.uid = 1  # API key authenticated
-                # Update session headers
-                self.session.headers.update({'X-Openerp-Session-Id': self.api_key})
                 print("✅ API key authentication successful")
                 return True
             else:
