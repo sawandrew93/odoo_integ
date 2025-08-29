@@ -150,6 +150,7 @@ class OdooClient:
                                 print(f"✅ Live chat session created! ID: {session_id}")
                                 
                                 # Send the initial message as visitor (skip session check for new sessions)
+                                print(f"Sending initial message: '{message}' from {visitor_name}")
                                 self._send_initial_message(session_id, message, visitor_name)
                                 return session_id
                             else:
@@ -189,19 +190,26 @@ class OdooClient:
             }
             
             response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            print(f"Initial message response status: {response.status_code}")
             
             if response.status_code == 200:
                 result = response.json()
+                print(f"Initial message response: {result}")
                 if result.get('result'):
                     message_id = result['result']
                     print(f"✅ Initial message sent to session {session_id}, ID: {message_id}")
                     return True
+                else:
+                    print(f"❌ No result in response: {result}")
+            else:
+                print(f"❌ HTTP {response.status_code}: {response.text[:200]}")
             
-            print(f"❌ Failed to send initial message to session {session_id}")
             return False
             
         except Exception as e:
             print(f"Error sending initial message: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
