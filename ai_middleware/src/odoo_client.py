@@ -28,34 +28,27 @@ class OdooClient:
             return False
             
         try:
-            # Odoo 18 API key authentication via /jsonrpc endpoint
-            test_data = {
+            # First, get the user ID associated with this API key
+            # API keys in Odoo 18 require the user ID
+            auth_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "service": "object",
-                    "method": "execute_kw",
-                    "args": [
-                        self.db,
-                        None,  # uid not needed for API key
-                        self.api_key,  # API key as password
-                        "res.users",
-                        "search_read",
-                        [["id", "=", 1]],
-                        {"fields": ["id"], "limit": 1}
-                    ]
+                    "service": "common",
+                    "method": "authenticate",
+                    "args": [self.db, None, self.api_key, {}]
                 },
                 "id": 1
             }
             
-            response = self.session.post(f"{self.url}/jsonrpc", json=test_data)
+            response = self.session.post(f"{self.url}/jsonrpc", json=auth_data)
             result = response.json()
             
-            print(f"API key test response: {result}")
+            print(f"API key auth response: {result}")
             
             if response.status_code == 200 and result.get('result'):
-                self.uid = 1  # API key authenticated
-                print("✅ API key authentication successful")
+                self.uid = result['result']
+                print(f"✅ API key authentication successful, UID: {self.uid}")
                 return True
             else:
                 print(f"❌ API key authentication failed: {result.get('error', result)}")
