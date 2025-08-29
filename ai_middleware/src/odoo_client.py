@@ -28,15 +28,15 @@ class OdooClient:
             return False
             
         try:
-            # First, get the user ID associated with this API key
-            # API keys in Odoo 18 require the user ID
+            # Try different API key authentication methods
+            # Method 1: Direct API key as login
             auth_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
                     "service": "common",
                     "method": "authenticate",
-                    "args": [self.db, None, self.api_key, {}]
+                    "args": [self.db, self.api_key, self.api_key, {}]
                 },
                 "id": 1
             }
