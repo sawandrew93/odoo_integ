@@ -245,6 +245,9 @@ Response:"""
             # Post-process response
             response = re.sub(r'\bknowledge base\b', 'our information', response, flags=re.IGNORECASE)
             
+            # Add Vanguard support offer to all AI responses
+            response += "\n\n**Need more help? I can connect you with a Vanguard support representative anytime.**"
+            
             self.conversation_history[session_key].append(f"AI: {response}")
             return False, response, confidence
             
