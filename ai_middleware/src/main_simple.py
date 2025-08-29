@@ -34,9 +34,7 @@ app.add_middleware(
 odoo_client = OdooClient(
     url=os.getenv('ODOO_URL'),
     db=os.getenv('ODOO_DB'),
-    api_key=os.getenv('ODOO_API_KEY'),
-    username=os.getenv('ODOO_USERNAME'),  # Fallback
-    password=os.getenv('ODOO_PASSWORD')   # Fallback
+    api_key=os.getenv('ODOO_API_KEY')
 )
 
 # Initialize AI agent with error handling
@@ -458,10 +456,8 @@ async def debug_auth():
             "uid": odoo_client.uid,
             "url": odoo_client.url,
             "db": odoo_client.db,
-            "has_username": bool(getattr(odoo_client, 'username', None)),
-            "env_username": os.getenv('ODOO_USERNAME'),
-            "env_password": "***" if os.getenv('ODOO_PASSWORD') else None,
-            "env_api_key": "***" if os.getenv('ODOO_API_KEY') else None
+            "has_api_key": bool(odoo_client.api_key),
+            "api_key_length": len(odoo_client.api_key) if odoo_client.api_key else 0
         }
     except Exception as e:
         return {"error": f"Auth test failed: {str(e)}"}
