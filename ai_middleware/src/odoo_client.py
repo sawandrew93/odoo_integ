@@ -6,44 +6,84 @@ import base64
 from typing import Dict, Any, Optional
 
 class OdooClient:
-    def __init__(self, url: str, db: str, username: str, password: str):
+    def __init__(self, url: str, db: str, api_key: str = None, username: str = None, password: str = None):
         self.url = url.rstrip('/')
         self.db = db
-        self.username = username
-        self.password = password
+        self.api_key = api_key
+        self.username = username  # Fallback
+        self.password = password  # Fallback
         self.uid = None
         self.session = requests.Session()
         self.operator_states = {}  # Track operator changes
-        # Set proper headers for Odoo Online
-        self.session.headers.update({
+        
+        # Set headers based on auth method
+        headers = {
             'Content-Type': 'application/json',
             'User-Agent': 'Mozilla/5.0 (compatible; AI-Middleware/1.0)'
-        })
-        
-    def authenticate(self) -> bool:
-        """Authenticate with Odoo and get session"""
-        auth_data = {
-            "jsonrpc": "2.0",
-            "method": "call",
-            "params": {
-                "db": self.db,
-                "login": self.username,
-                "password": self.password
-            },
-            "id": 1
         }
         
-        try:
-            response = self.session.post(f"{self.url}/web/session/authenticate", json=auth_data)
-            result = response.json()
-            print(f"Auth response: {result}")
+        if self.api_key:
+            headers['Authorization'] = f'Bearer {self.api_key}'
             
-            if result.get('result') and result['result'].get('uid'):
-                self.uid = result['result']['uid']
-                return True
-        except Exception as e:
-            print(f"Auth error: {e}")
+        self.session.headers.update(headers)
+        
+    def authenticate(self) -> bool:
+        """Authenticate with Odoo using API key or fallback to username/password"""
+        
+        # Try API key authentication first
+        if self.api_key:
+            try:
+                # Test API key with a simple call
+                test_data = {
+                    "jsonrpc": "2.0",
+                    "method": "call",
+                    "params": {
+                        "model": "res.users",
+                        "method": "search_read",
+                        "args": [["id", "=", 1]], 
+                        "kwargs": {"fields": ["id"], "limit": 1}
+                    },
+                    "id": 1
+                }
+                
+                response = self.session.post(f"{self.url}/web/dataset/call_kw", json=test_data)
+                result = response.json()
+                
+                if response.status_code == 200 and not result.get('error'):
+                    self.uid = 1  # API key authenticated
+                    print("✅ API key authentication successful")
+                    return True
+                else:
+                    print(f"❌ API key authentication failed: {result.get('error', 'Unknown error')}")
+            except Exception as e:
+                print(f"API key auth error: {e}")
+        
+        # Fallback to username/password
+        if self.username and self.password:
+            auth_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "db": self.db,
+                    "login": self.username,
+                    "password": self.password
+                },
+                "id": 1
+            }
             
+            try:
+                response = self.session.post(f"{self.url}/web/session/authenticate", json=auth_data)
+                result = response.json()
+                print(f"Username/password auth response: {result}")
+                
+                if result.get('result') and result['result'].get('uid'):
+                    self.uid = result['result']['uid']
+                    print("✅ Username/password authentication successful")
+                    return True
+            except Exception as e:
+                print(f"Username/password auth error: {e}")
+        
+        print("❌ All authentication methods failed")
         return False
     
     def get_available_channels(self) -> list:
