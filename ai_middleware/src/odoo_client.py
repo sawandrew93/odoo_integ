@@ -219,25 +219,24 @@ class OdooClient:
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
-            # Send message and trigger notification
+            # Send message using same auth method as initial message
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "model": "discuss.channel",
-                    "method": "message_post",
-                    "args": [session_id],
-                    "kwargs": {
+                    "service": "object",
+                    "method": "execute_kw",
+                    "args": [self.db, self.uid, self.api_key, "discuss.channel", "message_post", [session_id], {
                         "body": message,
                         "message_type": "comment",
                         "author_id": False,
                         "email_from": f"{author_name} <visitor@livechat.com>"
-                    }
+                    }]
                 },
                 "id": 3
             }
             
-            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+            response = self.session.post(f"{self.url}/jsonrpc", json=message_data)
             
             if response.status_code == 200:
                 result = response.json()
@@ -348,22 +347,21 @@ class OdooClient:
                     "jsonrpc": "2.0",
                     "method": "call",
                     "params": {
-                        "model": "mail.message",
-                        "method": "search_read",
-                        "args": [[
+                        "service": "object",
+                        "method": "execute_kw",
+                        "args": [self.db, self.uid, self.api_key, "mail.message", "search_read", [[
                             ["res_id", "=", session_id], 
                             ["model", "=", "discuss.channel"],
                             ["id", ">", last_message_id],
                             ["author_id", "!=", False],
                             ["message_type", "=", "comment"],
                             ["subtype_id.name", "!=", "Note"]
-                        ], ["id", "body", "author_id", "date", "email_from", "attachment_ids", "message_type", "subtype_id"]],
-                        "kwargs": {"order": "date asc", "limit": 5}
+                        ], ["id", "body", "author_id", "date", "email_from", "attachment_ids", "message_type", "subtype_id"]], {"order": "date asc", "limit": 5}]
                     },
                     "id": 6
                 }
                 
-                response = self.session.post(f"{self.url}/web/dataset/call_kw", json=message_data)
+                response = self.session.post(f"{self.url}/jsonrpc", json=message_data)
                 
                 if response.status_code == 200:
                     result = response.json()
