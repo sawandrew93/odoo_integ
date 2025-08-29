@@ -34,8 +34,9 @@ app.add_middleware(
 odoo_client = OdooClient(
     url=os.getenv('ODOO_URL'),
     db=os.getenv('ODOO_DB'),
-    username=os.getenv('ODOO_USERNAME'),
-    password=os.getenv('ODOO_PASSWORD')
+    api_key=os.getenv('ODOO_API_KEY'),
+    username=os.getenv('ODOO_USERNAME'),  # Fallback
+    password=os.getenv('ODOO_PASSWORD')   # Fallback
 )
 
 # Initialize AI agent with error handling
