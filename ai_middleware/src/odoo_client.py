@@ -13,6 +13,7 @@ class OdooClient:
         self.uid = None
         self.session = requests.Session()
         self.operator_states = {}  # Track operator changes
+        self.session_uuids = {}  # Map session_id -> uuid for visitor messages
         
         # Set basic headers
         self.session.headers.update({
@@ -133,26 +134,39 @@ class OdooClient:
                         if result.get('result') and result['result'] != False:
                             session_data = result['result']
                             
-                            # Extract session ID from discuss.channel array or channel_id
+                            # Extract session info - need both ID and UUID
                             session_id = None
+                            channel_uuid = None
                             
                             # Method 1: Try to get from discuss.channel array
                             if 'discuss.channel' in session_data:
                                 channels = session_data['discuss.channel']
                                 if channels and len(channels) > 0:
                                     session_id = channels[0]['id']
+                                    channel_uuid = channels[0].get('uuid')
                             
                             # Method 2: Try to get from channel_id field
                             if not session_id and 'channel_id' in session_data:
                                 session_id = session_data['channel_id']
                             
+                            # Method 3: Try to get UUID from root level
+                            if not channel_uuid and 'uuid' in session_data:
+                                channel_uuid = session_data['uuid']
+                            
                             if session_id:
-                                print(f"✅ Live chat session created! ID: {session_id}")
+                                print(f"✅ Live chat session created! ID: {session_id}, UUID: {channel_uuid}")
                                 
-                                # Send the initial message as visitor (skip session check for new sessions)
-                                print(f"Sending initial message: '{message}' from {visitor_name}")
-                                self._send_initial_message(session_id, message, visitor_name)
-                                return session_id
+                                # Store UUID mapping for visitor messages
+                                if channel_uuid:
+                                    self.session_uuids[session_id] = channel_uuid
+                                
+                                # Use UUID for visitor messages (fallback to ID)
+                                visitor_session_id = channel_uuid if channel_uuid else session_id
+                                
+                                # Send the initial message as visitor
+                                print(f"Sending initial visitor message: '{message}' from {visitor_name}")
+                                self._send_initial_message(visitor_session_id, message, visitor_name)
+                                return session_id  # Return numeric ID for other operations
                             else:
                                 print(f"❌ Could not extract session ID from response")
                                 continue
@@ -170,89 +184,71 @@ class OdooClient:
         return None
     
     def _send_initial_message(self, session_id: int, message: str, author_name: str) -> bool:
-        """Send initial message to newly created session (skips active check)"""
+        """Send initial message as anonymous visitor"""
         try:
+            # Use visitor message API (no authentication needed)
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "service": "object",
-                    "method": "execute_kw",
-                    "args": [self.db, self.uid, self.api_key, "discuss.channel", "message_post", [session_id], {
-                        "body": message,
-                        "message_type": "comment",
-                        "author_id": False,
-                        "email_from": f"{author_name} <visitor@livechat.com>"
-                    }]
+                    "channel_uuid": session_id,
+                    "message": message
                 },
                 "id": 3
             }
             
-            response = self.session.post(f"{self.url}/jsonrpc", json=message_data)
-            print(f"Initial message response status: {response.status_code}")
+            response = self.session.post(f"{self.url}/im_livechat/visitor_send_message", json=message_data)
+            print(f"Initial visitor message response status: {response.status_code}")
             
             if response.status_code == 200:
                 result = response.json()
-                print(f"Initial message response: {result}")
-                if result.get('result'):
-                    message_id = result['result']
-                    print(f"✅ Initial message sent to session {session_id}, ID: {message_id}")
+                print(f"Initial visitor message response: {result}")
+                if result.get('result') is not False:
+                    print(f"✅ Initial visitor message sent to session {session_id}")
                     return True
-                else:
-                    print(f"❌ No result in response: {result}")
-            else:
-                print(f"❌ HTTP {response.status_code}: {response.text[:200]}")
             
+            print(f"❌ Failed to send visitor message: {response.text[:200]}")
             return False
             
         except Exception as e:
-            print(f"Error sending initial message: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Error sending initial visitor message: {e}")
             return False
     
     def send_message_to_session(self, session_id: int, message: str, author_name: str) -> bool:
-        """Send message as visitor with instant notification"""
+        """Send message as anonymous visitor"""
         try:
             # Skip session check for system messages
             if author_name != "System" and not self.is_session_active(session_id):
                 print(f"Session {session_id} is not active, cannot send message")
                 return False
             
-            # Send message using same auth method as initial message
+            # Get UUID for visitor messages (fallback to session_id)
+            channel_uuid = self.session_uuids.get(session_id, session_id)
+            
+            # Use visitor message API (no authentication needed)
             message_data = {
                 "jsonrpc": "2.0",
                 "method": "call",
                 "params": {
-                    "service": "object",
-                    "method": "execute_kw",
-                    "args": [self.db, self.uid, self.api_key, "discuss.channel", "message_post", [session_id], {
-                        "body": message,
-                        "message_type": "comment",
-                        "author_id": False,
-                        "email_from": f"{author_name} <visitor@livechat.com>"
-                    }]
+                    "channel_uuid": channel_uuid,
+                    "message": message
                 },
                 "id": 3
             }
             
-            response = self.session.post(f"{self.url}/jsonrpc", json=message_data)
+            response = self.session.post(f"{self.url}/im_livechat/visitor_send_message", json=message_data)
             
             if response.status_code == 200:
                 result = response.json()
-                if result.get('result'):
-                    message_id = result['result']
-                    print(f"✅ Message sent to session {session_id}, ID: {message_id}")
-                    
-                    # Trigger bus notification for instant delivery
-                    self._trigger_notification(session_id, message_id)
+                if result.get('result') is not False:
+                    print(f"✅ Visitor message sent to session {session_id}")
                     return True
             
-            print(f"❌ Failed to send message to session {session_id}")
+            print(f"❌ Failed to send visitor message to session {session_id}: {response.text[:200]}")
             return False
             
         except Exception as e:
-            print(f"Error sending message: {e}")
+            print(f"Error sending visitor message: {e}")
             return False
     
     def _trigger_notification(self, session_id: int, message_id: int):
@@ -581,8 +577,10 @@ class OdooClient:
             return False
     
     def send_file_to_session(self, session_id: int, file_name: str, file_content: bytes, content_type: str, message: str = "") -> bool:
-        """Send file attachment to Odoo live chat session"""
+        """Send file attachment as visitor to Odoo live chat session"""
         try:
+            # For file uploads, we still need authentication to create attachments
+            # But we'll send the message as visitor
             if not self.uid:
                 if not self.authenticate():
                     return False
@@ -616,9 +614,27 @@ class OdooClient:
                 if result.get('result'):
                     attachment_id = result['result']
                     
-                    # Send message with attachment
-                    message_body = message if message else file_name
+                    # Try to send as visitor first, fallback to authenticated if needed
+                    message_body = message if message else f"📎 {file_name}"
                     
+                    # Try visitor API first
+                    visitor_data = {
+                        "jsonrpc": "2.0",
+                        "method": "call",
+                        "params": {
+                            "channel_uuid": session_id,
+                            "message": message_body
+                        },
+                        "id": 12
+                    }
+                    
+                    visitor_response = self.session.post(f"{self.url}/im_livechat/visitor_send_message", json=visitor_data)
+                    
+                    if visitor_response.status_code == 200 and visitor_response.json().get('result') is not False:
+                        print(f"✅ File {file_name} sent as visitor to session {session_id}")
+                        return True
+                    
+                    # Fallback to authenticated message with attachment
                     message_data = {
                         "jsonrpc": "2.0",
                         "method": "call",
