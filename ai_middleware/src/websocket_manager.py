@@ -21,6 +21,10 @@ class WebSocketManager:
         task = asyncio.create_task(self._monitor_session(session_id))
         self.tasks[session_id] = task
         
+        # Start presence maintenance
+        presence_task = asyncio.create_task(self._maintain_presence(session_id))
+        self.tasks[f"{session_id}_presence"] = presence_task
+        
         print(f"✅ WebSocket connected for session {session_id}")
     
     def disconnect(self, session_id: int):
@@ -31,6 +35,12 @@ class WebSocketManager:
         if session_id in self.tasks:
             self.tasks[session_id].cancel()
             del self.tasks[session_id]
+        
+        # Cancel presence task
+        presence_key = f"{session_id}_presence"
+        if presence_key in self.tasks:
+            self.tasks[presence_key].cancel()
+            del self.tasks[presence_key]
         
         print(f"🔌 WebSocket disconnected for session {session_id}")
     
@@ -112,3 +122,14 @@ class WebSocketManager:
         finally:
             longpoll_task.cancel()
             self.disconnect(session_id)
+    
+    async def _maintain_presence(self, session_id: int):
+        """Maintain visitor presence every 30 seconds"""
+        try:
+            while session_id in self.connections:
+                await asyncio.sleep(30)
+                self.odoo_client.maintain_visitor_presence(session_id)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            print(f"Error maintaining presence for {session_id}: {e}")

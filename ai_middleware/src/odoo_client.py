@@ -160,6 +160,9 @@ class OdooClient:
                                 if channel_uuid:
                                     self.session_uuids[session_id] = channel_uuid
                                 
+                                # Establish visitor presence to avoid "disconnected" status
+                                self._establish_visitor_presence(session_id, visitor_name)
+                                
                                 # Use UUID for visitor messages (fallback to ID)
                                 visitor_session_id = channel_uuid if channel_uuid else session_id
                                 
@@ -714,3 +717,52 @@ class OdooClient:
         except Exception as e:
             print(f"Error sending file: {e}")
             return False
+    
+    def _establish_visitor_presence(self, session_id: int, visitor_name: str):
+        """Establish visitor presence to prevent 'disconnected' status"""
+        try:
+            # Update channel to mark visitor as present
+            presence_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "write",
+                    "args": [[session_id], {
+                        "livechat_visitor_name": visitor_name,
+                        "livechat_active": True
+                    }],
+                    "kwargs": {}
+                },
+                "id": 15
+            }
+            
+            response = self.session.post(f"{self.url}/web/dataset/call_kw", json=presence_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('result'):
+                    print(f"✅ Visitor presence established for session {session_id}")
+                    
+        except Exception as e:
+            print(f"Error establishing visitor presence: {e}")
+    
+    def maintain_visitor_presence(self, session_id: int):
+        """Maintain visitor presence - call periodically"""
+        try:
+            presence_data = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": "discuss.channel",
+                    "method": "_update_visitor_last_seen",
+                    "args": [session_id],
+                    "kwargs": {}
+                },
+                "id": 16
+            }
+            
+            self.session.post(f"{self.url}/web/dataset/call_kw", json=presence_data)
+            
+        except Exception as e:
+            print(f"Error maintaining presence: {e}")
